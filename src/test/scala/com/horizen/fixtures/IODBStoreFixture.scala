@@ -53,7 +53,7 @@ trait IODBStoreFixture {
 
   def getStore() : Store = {
     val dir = tempDir()
-    val store = new LSMStore(dir, keySize)
+    val store = new LSMStore(dir, keySize, maxJournalEntryCount = 10000)
     stores.append(Tuple2(dir, store))
     store
   }

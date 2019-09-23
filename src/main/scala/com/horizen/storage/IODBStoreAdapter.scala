@@ -11,7 +11,7 @@ import com.horizen.utils.ByteArrayWrapper
 
 import scala.collection.mutable.ArrayBuffer
 
-class IODBStoreAdapter (store : Store)
+class IODBStoreAdapter (val store : Store)
   extends Storage {
 
   override def get(key: ByteArrayWrapper): Optional[ByteArrayWrapper] = {

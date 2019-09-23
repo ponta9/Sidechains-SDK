@@ -192,6 +192,32 @@
 			<version>3.6</version>
 		</dependency>
 
+		<!-- https://mvnrepository.com/artifact/org.iq80.leveldb/leveldb-project -->
+		<dependency>
+			<groupId>org.iq80.leveldb</groupId>
+			<artifactId>leveldb</artifactId>
+			<version>0.12</version>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/org.iq80.leveldb/leveldb-api -->
+		<dependency>
+			<groupId>org.iq80.leveldb</groupId>
+			<artifactId>leveldb-api</artifactId>
+			<version>0.12</version>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/org.fusesource.leveldbjni/leveldbjni -->
+		<dependency>
+			<groupId>org.fusesource.leveldbjni</groupId>
+			<artifactId>leveldbjni-all</artifactId>
+			<version>1.8</version>
+		</dependency>
+
+        <dependency>
+            <groupId>org.fusesource.leveldbjni</groupId>
+            <artifactId>leveldbjni</artifactId>
+            <version>1.8</version>
+        </dependency>
 	</dependencies>
 
 	<build>
