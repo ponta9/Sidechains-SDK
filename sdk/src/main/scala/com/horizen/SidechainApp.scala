@@ -5,18 +5,13 @@ import java.util.{HashMap => JHashMap, List => JList}
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.{ExceptionHandler, RejectionHandler}
-import com.google.inject._
 import com.google.inject.assistedinject.FactoryModuleBuilder
-import com.google.inject.name.Named
 import com.horizen.api.http._
 import com.horizen.block.{ProofOfWorkVerifier, SidechainBlock, SidechainBlockSerializer}
 import com.horizen.box.BoxSerializer
-import com.horizen.box.data.NoncedBoxDataSerializer
 import com.horizen.companion._
-import com.horizen.consensus.ConsensusDataStorage
 import com.horizen.forge.{ForgerRef, MainchainSynchronizer}
 import com.horizen.params._
-import com.horizen.proof.ProofSerializer
 import com.horizen.secret.{PrivateKey25519Serializer, SecretSerializer}
 import com.horizen.state.ApplicationState
 import com.horizen.storage._
@@ -27,7 +22,7 @@ import com.horizen.websocket._
 import scorex.core.api.http.ApiRoute
 import scorex.core.app.Application
 import scorex.core.network.message.MessageSpec
-import scorex.core.network.{NodeViewSynchronizerRef, PeerFeature}
+import scorex.core.network.PeerFeature
 import scorex.core.serialization.ScorexSerializer
 import scorex.core.settings.ScorexSettings
 import scorex.core.transaction.Transaction
@@ -39,6 +34,12 @@ import scala.collection.immutable.Map
 import scala.collection.mutable
 import scala.io.Source
 import scala.util.Try
+import com.google.inject._
+import com.google.inject.name.Named
+import com.horizen.box.data.NoncedBoxDataSerializer
+import com.horizen.consensus.ConsensusDataStorage
+import com.horizen.network.SidechainNodeViewSynchronizer
+import com.horizen.proof.ProofSerializer
 
 class SidechainApp @Inject()
   (@Named("SidechainSettings") val sidechainSettings: SidechainSettings,
@@ -176,12 +177,8 @@ class SidechainApp @Inject()
       Transaction.ModifierTypeId -> sidechainTransactionsCompanion)
 
   override val nodeViewSynchronizer: ActorRef =
-    actorSystem.actorOf(NodeViewSynchronizerRef.props[SidechainTypes#SCBT, SidechainSyncInfo, SidechainSyncInfoMessageSpec.type,
-      SidechainBlock, SidechainHistory, SidechainMemoryPool]
-      (networkControllerRef, nodeViewHolderRef,
-        SidechainSyncInfoMessageSpec, settings.network, timeProvider,
-        modifierSerializers
-      ))
+    actorSystem.actorOf(SidechainNodeViewSynchronizer.props(networkControllerRef, nodeViewHolderRef,
+        SidechainSyncInfoMessageSpec, settings.network, timeProvider, modifierSerializers))
 
   // Retrieve information for using a web socket connector
   val communicationClient: WebSocketCommunicationClient = new WebSocketCommunicationClient()
