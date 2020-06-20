@@ -15,17 +15,17 @@
 
 	<repositories>
 		<repository>
-			<id>scala-tools.org</id>
-			<name>Scala-Tools Maven2 Repository</name>
-			<url>http://scala-tools.org/repo-releases</url>
+			<id>net.alchim31.maven</id>
+			<name>Scala Maven Plugin</name>
+			<url>https://mvnrepository.com/artifact/net.alchim31.maven/scala-maven-plugin</url>
 		</repository>
 	</repositories>
 
 	<pluginRepositories>
 		<pluginRepository>
-			<id>scala-tools.org</id>
-			<name>Scala-Tools Maven2 Repository</name>
-			<url>http://scala-tools.org/repo-releases</url>
+			<id>net.alchim31.maven</id>
+			<name>Scala Maven Plugin</name>
+			<url>https://mvnrepository.com/artifact/net.alchim31.maven/scala-maven-plugin</url>
 		</pluginRepository>
 	</pluginRepositories>
 
