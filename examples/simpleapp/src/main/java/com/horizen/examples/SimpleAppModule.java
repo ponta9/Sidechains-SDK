@@ -15,6 +15,7 @@ import com.horizen.api.http.ApplicationApiGroup;
 import com.horizen.box.*;
 import com.horizen.box.data.NoncedBoxData;
 import com.horizen.box.data.NoncedBoxDataSerializer;
+import com.horizen.examples.car.CarApi;
 import com.horizen.proof.Proof;
 import com.horizen.proof.ProofSerializer;
 import com.horizen.proposition.Proposition;
@@ -64,6 +65,7 @@ public class SimpleAppModule
 
         // Here I can add my custom rest api and/or override existing one
         List<ApplicationApiGroup> customApiGroups = new ArrayList<>();
+        customApiGroups.add(new CarApi());
 
         // Here I can reject some of existing API routes
         // Each pair consists of "group name" -> "route name"
