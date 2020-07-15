@@ -12,6 +12,7 @@ import java.math.BigInteger;
 import java.util.Arrays;
 
 public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Proposition, CarSellOrder, CarSellOrderData> {
+  private final PublicKey25519Proposition sellerProposition;
   private final BigInteger vin;
 
   @Override
@@ -19,6 +20,7 @@ public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Propos
     return Bytes.concat(
         proposition().bytes(),
         Longs.toByteArray(value()),
+        sellerProposition.bytes(),
         vin.toByteArray()
     );
   }
@@ -35,10 +37,11 @@ public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Propos
     return 42;
   }
 
-  public CarSellOrderData(PublicKey25519Proposition proposition, long value, BigInteger vin)
+  public CarSellOrderData(PublicKey25519Proposition proposition, long value, BigInteger vin, PublicKey25519Proposition sellerProposition)
   {
     super(proposition, value);
     this.vin = vin;
+    this.sellerProposition = sellerProposition;
   }
 
   @Override
@@ -50,18 +53,21 @@ public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Propos
   @Override
   public byte[] customFieldsHash()
   {
-    return Blake2b256.hash(vin.toByteArray());
+    return Blake2b256.hash(Bytes.concat(this.sellerProposition.pubKeyBytes(), vin.toByteArray()));
   }
 
   public static CarSellOrderData parseBytes(byte[] bytes) {
-    int valueOffset = PublicKey25519Proposition.getLength();
-    int activeOffset = valueOffset + Longs.BYTES;
+    int propositionLength = PublicKey25519Proposition.getLength();
 
-    PublicKey25519Proposition proposition = PublicKey25519PropositionSerializer.getSerializer().parseBytes(Arrays.copyOf(bytes, valueOffset));
-    long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, valueOffset, activeOffset));
-    BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, activeOffset, activeOffset + Longs.BYTES));
+    PublicKey25519Proposition proposition = PublicKey25519PropositionSerializer.getSerializer()
+            .parseBytes(Arrays.copyOf(bytes, propositionLength));
+    long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, propositionLength, propositionLength + Longs.BYTES));
 
-    return new CarSellOrderData(proposition, value, vin);
+    PublicKey25519Proposition sellerProposition = PublicKey25519PropositionSerializer.getSerializer()
+            .parseBytes(Arrays.copyOfRange(bytes, propositionLength + Longs.BYTES, 2*propositionLength + Longs.BYTES));
+
+    BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, 2*propositionLength + Longs.BYTES, bytes.length));
+    return new CarSellOrderData(proposition, value, vin, sellerProposition);
   }
 
   @Override
@@ -70,10 +76,13 @@ public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Propos
     return "CarSellOrderData{" +
         "vin=" + vin + ";" +
         "proposition=" + proposition() +
+        "sellerProposition=" + proposition() +
         '}';
   }
 
   public BigInteger getVin() {
     return vin;
   }
+
+  public PublicKey25519Proposition getSellerProposition() { return sellerProposition; }
 }

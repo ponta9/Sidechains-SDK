@@ -35,12 +35,6 @@ import java.util.Optional;
 //simple way to add description for usage in swagger?
 public class CarApi extends ApplicationApiGroup
 {
-  private SidechainCoreTransactionFactory sidechainCoreTransactionFactory;
-
-  public CarApi() {
-    //Injector injector = Guice.createInjector(this);
-    //this.sidechainCoreTransactionFactory = injector.getInstance(classOf[SidechainCoreTransactionFactory])
-  }
 
   @Override
   public String basePath() {
@@ -108,12 +102,12 @@ public class CarApi extends ApplicationApiGroup
       inputIds.add(carBox.id());
 
       List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
-      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, 1, carBox.getBoxData().getVin());
+      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, 1, carBox.getBoxData().getVin(), carBox.proposition());
       outputs.add((NoncedBoxData)carSellOrderData);
 
       List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
 
-      SidechainCoreTransaction unsignedTransaction = sidechainCoreTransactionFactory.create(inputIds, outputs, fakeProofs, fee, timestamp);
+      SidechainCoreTransaction unsignedTransaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, fakeProofs, fee, timestamp);
 
       byte[] messageToSign = unsignedTransaction.messageToSign();
 
@@ -121,11 +115,11 @@ public class CarApi extends ApplicationApiGroup
 
       proofs.add(view.getNodeWallet().secretByPublicKey(carBox.proposition()).get().sign(messageToSign));
 
-      SidechainCoreTransaction transaction = sidechainCoreTransactionFactory.create(inputIds, outputs, proofs, fee, timestamp);
+      SidechainCoreTransaction transaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, proofs, fee, timestamp);
 
       return new CreateCarSellOrderResponce(transaction);
     } catch (Exception e) {
-      return new CarResponseError("0102", "Error.", Some.apply(e));
+      return new CarResponseError("0102", "Error during Car Sell Order creation.", Some.apply(e));
     }
   }
 
@@ -156,8 +150,15 @@ public class CarApi extends ApplicationApiGroup
       inputIds.add(paymentBox.id());
 
       List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
-      CarBoxData carBoxData = new CarBoxData(ent.sellerProposition, 1, carSellOrder.getBoxData().getVin());
+      CarBoxData carBoxData = new CarBoxData(ent.buyerProposition, 1, carSellOrder.getBoxData().getVin());
       outputs.add((NoncedBoxData)carBoxData);
+
+      if (paymentBox.value() < carSellOrder.value())
+        throw new IllegalArgumentException("RegularBox to spend does not contain enough coins.");
+
+      RegularBoxData paymentData = new RegularBoxData(carSellOrder.getBoxData().getSellerProposition(), carSellOrder.value());
+      outputs.add((NoncedBoxData)paymentData);
+
 
       if (paymentBox.value() > carSellOrder.value()) {
         RegularBoxData differenceData = new RegularBoxData(ent.buyerProposition, paymentBox.value() - carSellOrder.value());
@@ -166,16 +167,18 @@ public class CarApi extends ApplicationApiGroup
 
       List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
 
-      SidechainCoreTransaction unsignedTransaction = sidechainCoreTransactionFactory.create(inputIds, outputs, fakeProofs, fee, timestamp);
+      SidechainCoreTransaction unsignedTransaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, fakeProofs, fee, timestamp);
 
       byte[] messageToSign = unsignedTransaction.messageToSign();
 
       List<Proof<Proposition>> proofs = new ArrayList<>();
 
       proofs.add(view.getNodeWallet().secretByPublicKey(carSellOrder.proposition()).get().sign(messageToSign));
-      proofs.add(view.getNodeWallet().secretByPublicKey(ent.sellerProposition).get().sign(messageToSign));
 
-      SidechainCoreTransaction transaction = sidechainCoreTransactionFactory.create(inputIds, outputs, proofs, fee, timestamp);
+      if (paymentBox.value() > carSellOrder.value())
+        proofs.add(view.getNodeWallet().secretByPublicKey(ent.buyerProposition).get().sign(messageToSign));
+
+      SidechainCoreTransaction transaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, proofs, fee, timestamp);
 
       return new AcceptCarSellOrderResponce(transaction);
     } catch (Exception e) {
@@ -300,7 +303,6 @@ public class CarApi extends ApplicationApiGroup
     String carSellOrderId;
     String paymentRegularBoxId;
     PublicKey25519Proposition buyerProposition;
-    PublicKey25519Proposition sellerProposition;
 
     public String getCarSellOrderId()
     {
@@ -331,17 +333,6 @@ public class CarApi extends ApplicationApiGroup
     {
       byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
       buyerProposition = new PublicKey25519Proposition(propositionBytes);
-    }
-
-    public PublicKey25519Proposition getSellerProposition()
-    {
-      return sellerProposition;
-    }
-
-    public void setSellerProposition(String propositionHexBytes)
-    {
-      byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
-      sellerProposition = new PublicKey25519Proposition(propositionBytes);
     }
 
   }
