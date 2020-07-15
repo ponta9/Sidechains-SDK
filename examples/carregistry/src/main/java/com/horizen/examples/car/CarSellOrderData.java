@@ -34,7 +34,7 @@ public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Propos
   @Override
   public byte boxDataTypeId()
   {
-    return 42;
+    return 43;
   }
 
   public CarSellOrderData(PublicKey25519Proposition proposition, long value, BigInteger vin, PublicKey25519Proposition sellerProposition)

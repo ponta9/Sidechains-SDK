@@ -17,5 +17,6 @@
 		<module>sdk</module>
 		<module>examples/simpleapp</module>
 		<module>tools/sctool</module>
+		<module>examples/carregistry</module>
 	</modules>
 </project>
