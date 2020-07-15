@@ -2,21 +2,43 @@ package com.horizen.examples.car;
 
 import akka.http.javadsl.server.Route;
 import com.fasterxml.jackson.annotation.JsonView;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import com.horizen.api.http.ApiResponse;
 import com.horizen.api.http.ApplicationApiGroup;
+import com.horizen.api.http.ErrorResponse;
 import com.horizen.api.http.SuccessResponse;
+import com.horizen.box.NoncedBox;
+import com.horizen.box.RegularBox;
+import com.horizen.box.data.NoncedBoxData;
+import com.horizen.box.data.RegularBoxData;
 import com.horizen.node.SidechainNodeView;
+import com.horizen.proof.Proof;
+import com.horizen.proposition.Proposition;
 import com.horizen.proposition.PublicKey25519Proposition;
 import com.horizen.serialization.Views;
+import com.horizen.transaction.SidechainCoreTransaction;
+import com.horizen.transaction.SidechainCoreTransactionFactory;
+import com.horizen.transaction.SidechainTransaction;
 import com.horizen.utils.BytesUtils;
+import scala.Option;
+import scala.Some;
+
+import com.horizen.box.Box;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 //simple way to add description for usage in swagger?
 public class CarApi extends ApplicationApiGroup
 {
+  private SidechainCoreTransactionFactory sidechainCoreTransactionFactory;
+
+  public CarApi() {
+    //Injector injector = Guice.createInjector(this);
+    //this.sidechainCoreTransactionFactory = injector.getInstance(classOf[SidechainCoreTransactionFactory])
+  }
+
   @Override
   public String basePath() {
     return "carApi";
@@ -26,12 +48,107 @@ public class CarApi extends ApplicationApiGroup
   public List<Route> getRoutes() {
     List<Route> routes = new ArrayList<>();
     routes.add(bindPostRequest("createCar", this::createCar, CreateCarBoxRequest.class));
+    routes.add(bindPostRequest("createCarSellOrder", this::createCarSellOrder, CreateCarSellOrderRequest.class));
+    routes.add(bindPostRequest("acceptCarSellOrder", this::acceptCarSellOrder, AcceptCarSellOrderRequest.class));
     return routes;
   }
 
   private ApiResponse createCar(SidechainNodeView view, CreateCarBoxRequest ent) {
     CarBoxData carBoxData = new CarBoxData(ent.proposition, 1, ent.vin);
     return new CarResponse();
+  }
+
+  private ApiResponse createCarSellOrder(SidechainNodeView view, CreateCarSellOrderRequest ent) {
+    try {
+      long timestamp = System.currentTimeMillis();
+      long fee = 0;
+      CarBox carBox = null;
+
+      for (Box b : view.getNodeWallet().boxesOfType(CarBox.class)) {
+        if (Arrays.equals(b.id(), BytesUtils.fromHexString(ent.carBoxId)))
+          carBox = (CarBox) b;
+      }
+
+      if (carBox == null)
+        throw new IllegalArgumentException("CarBox not found.");
+
+      List<byte[]> inputIds = new ArrayList<byte[]>();
+      inputIds.add(carBox.id());
+
+      List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
+      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, 1, carBox.getBoxData().getVin());
+      outputs.add((NoncedBoxData)carSellOrderData);
+
+      List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
+
+      SidechainCoreTransaction unsignedTransaction = sidechainCoreTransactionFactory.create(inputIds, outputs, fakeProofs, fee, timestamp);
+
+      byte[] messageToSign = unsignedTransaction.messageToSign();
+
+      List<Proof<Proposition>> proofs = new ArrayList<>();
+
+      proofs.add(view.getNodeWallet().secretByPublicKey(carBox.proposition()).get().sign(messageToSign));
+
+      SidechainCoreTransaction transaction = sidechainCoreTransactionFactory.create(inputIds, outputs, proofs, fee, timestamp);
+
+      return new CreateCarSellOrderResponce(transaction);
+    } catch (Exception e) {
+      return new CarErrorResponce("Error.", Some.apply(e));
+    }
+  }
+
+  private ApiResponse acceptCarSellOrder(SidechainNodeView view, AcceptCarSellOrderRequest ent) {
+    try {
+      long timestamp = System.currentTimeMillis();
+      long fee = 0;
+      CarSellOrder carSellOrder = null;
+      RegularBox paymentBox = null;
+
+      for (Box b : view.getNodeWallet().boxesOfType(CarSellOrder.class)) {
+        if (Arrays.equals(b.id(), BytesUtils.fromHexString(ent.carSellOrderId)))
+          carSellOrder = (CarSellOrder) b;
+      }
+
+      if (carSellOrder == null)
+        throw new IllegalArgumentException("CarSellOrder not found.");
+
+      for (Box b : view.getNodeWallet().boxesOfType(RegularBox.class))
+        if (Arrays.equals(b.id(), BytesUtils.fromHexString(ent.paymentRegularBoxId)))
+          paymentBox = (RegularBox) b;
+
+      if (paymentBox == null)
+        throw new IllegalArgumentException("RegularBox to spend is not found.");
+
+      List<byte[]> inputIds = new ArrayList<byte[]>();
+      inputIds.add(carSellOrder.id());
+      inputIds.add(paymentBox.id());
+
+      List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
+      CarBoxData carBoxData = new CarBoxData(ent.sellerProposition, 1, carSellOrder.getBoxData().getVin());
+      outputs.add((NoncedBoxData)carBoxData);
+
+      if (paymentBox.value() > carSellOrder.value()) {
+        RegularBoxData differenceData = new RegularBoxData(ent.buyerProposition, paymentBox.value() - carSellOrder.value());
+        outputs.add((NoncedBoxData)differenceData);
+      }
+
+      List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
+
+      SidechainCoreTransaction unsignedTransaction = sidechainCoreTransactionFactory.create(inputIds, outputs, fakeProofs, fee, timestamp);
+
+      byte[] messageToSign = unsignedTransaction.messageToSign();
+
+      List<Proof<Proposition>> proofs = new ArrayList<>();
+
+      proofs.add(view.getNodeWallet().secretByPublicKey(carSellOrder.proposition()).get().sign(messageToSign));
+      proofs.add(view.getNodeWallet().secretByPublicKey(ent.sellerProposition).get().sign(messageToSign));
+
+      SidechainCoreTransaction transaction = sidechainCoreTransactionFactory.create(inputIds, outputs, proofs, fee, timestamp);
+
+      return new AcceptCarSellOrderResponce(transaction);
+    } catch (Exception e) {
+      return new CarErrorResponce("Error.", Some.apply(e));
+    }
   }
 
   public static class CreateCarBoxRequest {
@@ -63,5 +180,149 @@ public class CarApi extends ApplicationApiGroup
   @JsonView(Views.CustomView.class)
   class CarResponse implements SuccessResponse{
   }
+
+  public static class CreateCarSellOrderRequest {
+    String carBoxId;
+    PublicKey25519Proposition proposition;
+
+    public String getCarBoxId()
+    {
+      return carBoxId;
+    }
+
+    public void setCarBoxId(String carBoxId)
+    {
+      this.carBoxId = carBoxId;
+    }
+
+    public PublicKey25519Proposition getProposition()
+    {
+      return proposition;
+    }
+
+    public void setProposition(String propositionHexBytes)
+    {
+      byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
+      proposition = new PublicKey25519Proposition(propositionBytes);
+    }
+  }
+
+  @JsonView(Views.CustomView.class)
+  class CreateCarSellOrderResponce implements SuccessResponse{
+    private SidechainCoreTransaction sidechainCoreTransaction;
+
+    public CreateCarSellOrderResponce(SidechainCoreTransaction sidechainCoreTransaction) {
+      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    }
+
+    public SidechainCoreTransaction getSidechainCoreTransaction() {
+      return sidechainCoreTransaction;
+    }
+
+    public void setSidechainCoreTransaction(SidechainCoreTransaction sidechainCoreTransaction) {
+      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    }
+  }
+
+  public static class AcceptCarSellOrderRequest {
+    String carSellOrderId;
+    String paymentRegularBoxId;
+    PublicKey25519Proposition buyerProposition;
+    PublicKey25519Proposition sellerProposition;
+
+    public String getCarSellOrderId()
+    {
+      return carSellOrderId;
+    }
+
+    public void setCarSellOrderId(String carSellOrderId)
+    {
+      this.carSellOrderId = carSellOrderId;
+    }
+
+    public String getPaymentRegularBoxId()
+    {
+      return paymentRegularBoxId;
+    }
+
+    public void setPaymentRegularBoxId(String paymentRegularBoxId)
+    {
+      this.paymentRegularBoxId = paymentRegularBoxId;
+    }
+
+    public PublicKey25519Proposition getBuyerProposition()
+    {
+      return buyerProposition;
+    }
+
+    public void setBuyerProposition(String propositionHexBytes)
+    {
+      byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
+      buyerProposition = new PublicKey25519Proposition(propositionBytes);
+    }
+
+    public PublicKey25519Proposition getSellerProposition()
+    {
+      return sellerProposition;
+    }
+
+    public void setSellerProposition(String propositionHexBytes)
+    {
+      byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
+      sellerProposition = new PublicKey25519Proposition(propositionBytes);
+    }
+
+  }
+
+  @JsonView(Views.CustomView.class)
+  class AcceptCarSellOrderResponce implements SuccessResponse{
+    private SidechainCoreTransaction sidechainCoreTransaction;
+
+    public AcceptCarSellOrderResponce(SidechainCoreTransaction sidechainCoreTransaction) {
+      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    }
+
+    public SidechainCoreTransaction getSidechainCoreTransaction() {
+      return sidechainCoreTransaction;
+    }
+
+    public void setSidechainCoreTransaction(SidechainCoreTransaction sidechainCoreTransaction) {
+      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    }
+  }
+
+  @JsonView(Views.Default.class)
+  public class CarErrorResponce implements ErrorResponse
+  {
+    private String description;
+    private Option<Throwable> exception;
+
+    public CarErrorResponce(String description, Option<Throwable> exception) {
+      this.description = description;
+      this.exception = exception;
+    }
+
+    public String getDescription()
+    {
+      return description;
+    }
+
+    @Override
+    public String code() {
+      return "0901";
+    }
+
+    @Override
+    public String description() {
+      return description;
+    }
+
+    @Override
+    public Option<Throwable> exception() {
+      return exception;
+    }
+  }
+
+
 }
 

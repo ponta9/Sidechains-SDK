@@ -11,12 +11,7 @@ import scorex.crypto.hash.Blake2b256;
 import java.math.BigInteger;
 import java.util.Arrays;
 
-//Shall we add JSON annotation for AbstractNoncedBoxData? In that case we could pass just boxData during transaction creation
-//We need boxes without values!
-// creation all required functions are long and take a lot of time, create a python script for it?
-public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition, CarBox, CarBoxData> {
-
-  //TODO add additional attributes
+public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Proposition, CarSellOrder, CarSellOrderData> {
   private final BigInteger vin;
 
   @Override
@@ -40,17 +35,16 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
     return 42;
   }
 
-  public CarBoxData(PublicKey25519Proposition proposition, long value, BigInteger vin)
+  public CarSellOrderData(PublicKey25519Proposition proposition, long value, BigInteger vin)
   {
-    super(proposition, 1);
+    super(proposition, value);
     this.vin = vin;
   }
 
   @Override
-  public CarBox getBox(long nonce)
+  public CarSellOrder getBox(long nonce)
   {
-    //shall we create a copy of data?
-    return new CarBox(this, nonce);
+    return new CarSellOrder(this, nonce);
   }
 
   @Override
@@ -59,7 +53,7 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
     return Blake2b256.hash(vin.toByteArray());
   }
 
-  public static CarBoxData parseBytes(byte[] bytes) {
+  public static CarSellOrderData parseBytes(byte[] bytes) {
     int valueOffset = PublicKey25519Proposition.getLength();
     int activeOffset = valueOffset + Longs.BYTES;
 
@@ -67,23 +61,19 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
     long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, valueOffset, activeOffset));
     BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, activeOffset, activeOffset + Longs.BYTES));
 
-    return new CarBoxData(proposition, value, vin);
+    return new CarSellOrderData(proposition, value, vin);
   }
 
   @Override
   public String toString()
   {
-    return "CarBoxData{" +
+    return "CarSellOrderData{" +
         "vin=" + vin + ";" +
         "proposition=" + proposition() +
         '}';
   }
 
-  BigInteger getVin() {
+  public BigInteger getVin() {
     return vin;
   }
-  //Shall be finals in parent?
-  /*
-  public int hashCode();
-  public boolean equals(Object obj);*/
 }
