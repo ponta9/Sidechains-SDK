@@ -193,7 +193,7 @@ public class CarApi extends ApplicationApiGroup
 
       SidechainCoreTransaction transaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, proofs, fee, timestamp);
 
-      return new AcceptCarSellOrderResponce(transaction);
+      return new AcceptCarSellOrderResponce(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction)transaction)));
     } catch (Exception e) {
       return new CarResponseError("0103", "Error.", Some.apply(e));
     }
@@ -355,18 +355,16 @@ public class CarApi extends ApplicationApiGroup
 
   @JsonView(Views.Default.class)
   class AcceptCarSellOrderResponce implements SuccessResponse{
-    private SidechainCoreTransaction sidechainCoreTransaction;
+    private final String acceptedCarSellOrderTxBytes;
 
-    public AcceptCarSellOrderResponce(SidechainCoreTransaction sidechainCoreTransaction) {
-      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    public AcceptCarSellOrderResponce(String acceptedCarSellOrderTxBytes) {
+      this.acceptedCarSellOrderTxBytes = acceptedCarSellOrderTxBytes;
     }
 
-    public SidechainCoreTransaction getSidechainCoreTransaction() {
-      return sidechainCoreTransaction;
-    }
+    public String acceptedCarSellOrderTxBytes() { return acceptedCarSellOrderTxBytes;}
 
-    public void setSidechainCoreTransaction(SidechainCoreTransaction sidechainCoreTransaction) {
-      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    public String getAcceptedCarSellOrderTxBytes() {
+      return acceptedCarSellOrderTxBytes;
     }
   }
 
