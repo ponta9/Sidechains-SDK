@@ -4,7 +4,7 @@ import com.horizen.box.BoxSerializer;
 import scorex.util.serialization.Reader;
 import scorex.util.serialization.Writer;
 
-public class CarSellOrderSerializer implements BoxSerializer<CarBox>
+public class CarSellOrderSerializer implements BoxSerializer<CarSellOrder>
 {
 
   private static final CarSellOrderSerializer serializer;
@@ -22,13 +22,13 @@ public class CarSellOrderSerializer implements BoxSerializer<CarBox>
   }
 
   @Override
-  public void serialize(CarBox box, Writer writer) {
-    writer.putBytes(box.bytes());
+  public void serialize(CarSellOrder carSellOrder, Writer writer) {
+    writer.putBytes(carSellOrder.bytes());
   }
 
   @Override
-  public CarBox parse(Reader reader) {
-    return CarBox.parseBytes(reader.getBytes(reader.remaining()));
+  public CarSellOrder parse(Reader reader) {
+    return CarSellOrder.parseBytes(reader.getBytes(reader.remaining()));
   }
 
 }

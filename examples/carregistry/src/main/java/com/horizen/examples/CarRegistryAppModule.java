@@ -10,7 +10,10 @@ import com.horizen.box.BoxSerializer;
 import com.horizen.box.NoncedBox;
 import com.horizen.box.data.NoncedBoxData;
 import com.horizen.box.data.NoncedBoxDataSerializer;
-import com.horizen.examples.car.CarApi;
+import com.horizen.companion.SidechainBoxesDataCompanion;
+import com.horizen.companion.SidechainProofsCompanion;
+import com.horizen.companion.SidechainTransactionsCompanion;
+import com.horizen.examples.car.*;
 import com.horizen.proof.Proof;
 import com.horizen.proof.ProofSerializer;
 import com.horizen.proposition.Proposition;
@@ -46,7 +49,15 @@ public class CarRegistryAppModule
         SidechainSettings sidechainSettings = this.settingsReader.getSidechainSettings();
 
         HashMap<Byte, BoxSerializer<Box<Proposition>>> customBoxSerializers = new HashMap<>();
+
+        customBoxSerializers.put((byte)42, (BoxSerializer) CarBoxSerializer.getSerializer());
+        customBoxSerializers.put((byte)43, (BoxSerializer) CarSellOrderSerializer.getSerializer());
+
         HashMap<Byte, NoncedBoxDataSerializer<NoncedBoxData<Proposition, NoncedBox<Proposition>>>> customBoxDataSerializers = new HashMap<>();
+
+        customBoxDataSerializers.put((byte)42, (NoncedBoxDataSerializer) CarBoxDataSerializer.getSerializer());
+        customBoxDataSerializers.put((byte)43, (NoncedBoxDataSerializer) CarSellOrderDataSerializer.getSerializer());
+
         HashMap<Byte, SecretSerializer<Secret>> customSecretSerializers = new HashMap<>();
         HashMap<Byte, ProofSerializer<Proof<Proposition>>> customProofSerializers = new HashMap<>();
         HashMap<Byte, TransactionSerializer<BoxTransaction<Proposition, Box<Proposition>>>> customTransactionSerializers = new HashMap<>();
@@ -66,7 +77,12 @@ public class CarRegistryAppModule
 
         // Here I can add my custom rest api and/or override existing one
         List<ApplicationApiGroup> customApiGroups = new ArrayList<>();
-        customApiGroups.add(new CarApi());
+        customApiGroups.add(new CarApi(
+                new SidechainTransactionsCompanion(
+                        customTransactionSerializers,
+                        new SidechainBoxesDataCompanion(customBoxDataSerializers),
+                        new SidechainProofsCompanion(customProofSerializers)
+                )));
 
         // Here I can reject some of existing API routes
         // Each pair consists of "group name" -> "route name"

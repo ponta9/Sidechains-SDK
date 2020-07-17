@@ -13,11 +13,13 @@ import com.horizen.box.NoncedBox;
 import com.horizen.box.RegularBox;
 import com.horizen.box.data.NoncedBoxData;
 import com.horizen.box.data.RegularBoxData;
+import com.horizen.companion.SidechainTransactionsCompanion;
 import com.horizen.node.SidechainNodeView;
 import com.horizen.proof.Proof;
 import com.horizen.proposition.Proposition;
 import com.horizen.proposition.PublicKey25519Proposition;
 import com.horizen.serialization.Views;
+import com.horizen.transaction.BoxTransaction;
 import com.horizen.transaction.SidechainCoreTransaction;
 import com.horizen.transaction.SidechainCoreTransactionFactory;
 import com.horizen.transaction.SidechainTransaction;
@@ -36,6 +38,11 @@ import java.util.Optional;
 public class CarApi extends ApplicationApiGroup
 {
 
+  private final SidechainTransactionsCompanion sidechainTransactionsCompanion;
+
+  public CarApi(SidechainTransactionsCompanion sidechainTransactionsCompanion) {
+    this.sidechainTransactionsCompanion = sidechainTransactionsCompanion;
+  }
   @Override
   public String basePath() {
     return "carApi";
@@ -71,16 +78,22 @@ public class CarApi extends ApplicationApiGroup
     List<byte[]> inputIds = Collections.singletonList(BytesUtils.fromHexString(ent.boxId));
     Long timestamp = System.currentTimeMillis();
     List fakeProofs = Collections.nCopies(inputIds.size(), null);
-    List outputs = Collections.singletonList(output);
+
+    List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
+
+    outputs.add(output);
+    outputs.add((NoncedBoxData) carBoxData);
 
     SidechainCoreTransaction unsignedTransaction =
         getSidechainCoreTransactionFactory().create(inputIds, outputs, fakeProofs, ent.fee, timestamp);
     byte[] messageToSign = unsignedTransaction.messageToSign();
+
     Proof proof = view.getNodeWallet().secretByPublicKey(inputBox.proposition()).get().sign(messageToSign);
 
     SidechainCoreTransaction signedTransaction =
         getSidechainCoreTransactionFactory().create(inputIds, outputs, Collections.singletonList(proof), ent.fee, timestamp);
-    CarResponse result = new CarResponse(ByteUtils.toHexString(signedTransaction.bytes()));
+
+    CarResponse result = new CarResponse(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction)signedTransaction)));
     return result;
   }
 
@@ -102,7 +115,7 @@ public class CarApi extends ApplicationApiGroup
       inputIds.add(carBox.id());
 
       List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
-      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, 1, carBox.getBoxData().getVin(), carBox.proposition());
+      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, ent.sellPrice, carBox.getBoxData().getVin(), carBox.proposition());
       outputs.add((NoncedBoxData)carSellOrderData);
 
       List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
@@ -117,7 +130,7 @@ public class CarApi extends ApplicationApiGroup
 
       SidechainCoreTransaction transaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, proofs, fee, timestamp);
 
-      return new CreateCarSellOrderResponce(transaction);
+      return new CreateCarSellOrderResponce(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction)transaction)));
     } catch (Exception e) {
       return new CarResponseError("0102", "Error during Car Sell Order creation.", Some.apply(e));
     }
@@ -259,6 +272,7 @@ public class CarApi extends ApplicationApiGroup
   public static class CreateCarSellOrderRequest {
     String carBoxId;
     PublicKey25519Proposition proposition;
+    long sellPrice;
 
     public String getCarBoxId()
     {
@@ -280,22 +294,24 @@ public class CarApi extends ApplicationApiGroup
       byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
       proposition = new PublicKey25519Proposition(propositionBytes);
     }
+
+    public long getSellPrice() { return sellPrice; }
+
+    public void setSellPrice(long sellPrice) { this.sellPrice = sellPrice; }
   }
 
-  @JsonView(Views.CustomView.class)
+  @JsonView(Views.Default.class)
   class CreateCarSellOrderResponce implements SuccessResponse{
-    private SidechainCoreTransaction sidechainCoreTransaction;
+    private final String carSellOrderTxBytes;
 
-    public CreateCarSellOrderResponce(SidechainCoreTransaction sidechainCoreTransaction) {
-      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    public CreateCarSellOrderResponce(String carSellOrderTxBytes) {
+      this.carSellOrderTxBytes = carSellOrderTxBytes;
     }
 
-    public SidechainCoreTransaction getSidechainCoreTransaction() {
-      return sidechainCoreTransaction;
-    }
+    public String carSellOrderTxBytes() { return carSellOrderTxBytes;}
 
-    public void setSidechainCoreTransaction(SidechainCoreTransaction sidechainCoreTransaction) {
-      this.sidechainCoreTransaction = sidechainCoreTransaction;
+    public String getCarSellOrderTxBytes() {
+      return carSellOrderTxBytes;
     }
   }
 
@@ -337,7 +353,7 @@ public class CarApi extends ApplicationApiGroup
 
   }
 
-  @JsonView(Views.CustomView.class)
+  @JsonView(Views.Default.class)
   class AcceptCarSellOrderResponce implements SuccessResponse{
     private SidechainCoreTransaction sidechainCoreTransaction;
 

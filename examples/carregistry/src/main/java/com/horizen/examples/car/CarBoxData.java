@@ -31,7 +31,7 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
   @Override
   public NoncedBoxDataSerializer serializer()
   {
-    return null;
+    return CarBoxDataSerializer.getSerializer();
   }
 
   @Override
@@ -65,7 +65,7 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
 
     PublicKey25519Proposition proposition = PublicKey25519PropositionSerializer.getSerializer().parseBytes(Arrays.copyOf(bytes, valueOffset));
     long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, valueOffset, activeOffset));
-    BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, activeOffset, activeOffset + Longs.BYTES));
+    BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, activeOffset, bytes.length));
 
     return new CarBoxData(proposition, value, vin);
   }

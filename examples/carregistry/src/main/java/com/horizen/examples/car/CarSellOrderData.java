@@ -28,7 +28,7 @@ public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Propos
   @Override
   public NoncedBoxDataSerializer serializer()
   {
-    return null;
+    return CarSellOrderDataSerializer.getSerializer();
   }
 
   @Override

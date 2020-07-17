@@ -18,8 +18,8 @@ public final class CarSellOrderDataSerializer implements NoncedBoxDataSerializer
   }
 
   @Override
-  public void serialize(CarSellOrderData boxData, Writer writer) {
-    writer.putBytes(boxData.bytes());
+  public void serialize(CarSellOrderData carSellOrderData, Writer writer) {
+    writer.putBytes(carSellOrderData.bytes());
   }
 
   @Override
