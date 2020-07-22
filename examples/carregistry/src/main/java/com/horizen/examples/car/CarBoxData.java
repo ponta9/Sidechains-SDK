@@ -1,6 +1,7 @@
 package com.horizen.examples.car;
 
 import com.google.common.primitives.Bytes;
+import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.horizen.box.data.AbstractNoncedBoxData;
 import com.horizen.box.data.NoncedBoxDataSerializer;
@@ -18,12 +19,23 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
 
   //TODO add additional attributes
   private final BigInteger vin;
+  private final int year;
+  private final String model;
+  private final String color;
+  private final String description;
 
   @Override
   public byte[] bytes() {
     return Bytes.concat(
         proposition().bytes(),
         Longs.toByteArray(value()),
+        Ints.toByteArray(year),
+        Ints.toByteArray(model.getBytes().length),
+        model.getBytes(),
+        Ints.toByteArray(color.getBytes().length),
+        color.getBytes(),
+        Ints.toByteArray(description.getBytes().length),
+        description.getBytes(),
         vin.toByteArray()
     );
   }
@@ -40,10 +52,15 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
     return 42;
   }
 
-  public CarBoxData(PublicKey25519Proposition proposition, long value, BigInteger vin)
+  public CarBoxData(PublicKey25519Proposition proposition, long value, BigInteger vin,
+                    int year, String model, String color, String description)
   {
     super(proposition, 1);
     this.vin = vin;
+    this.year = year;
+    this.model = model;
+    this.color = color;
+    this.description = description;
   }
 
   @Override
