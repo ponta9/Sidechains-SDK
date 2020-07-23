@@ -89,32 +89,32 @@ public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Propos
             .parseBytes(Arrays.copyOf(bytes, PublicKey25519Proposition.getLength()));
     offset += PublicKey25519Proposition.getLength();
 
-    long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, offset, Longs.BYTES));
+    long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, offset, offset + Longs.BYTES));
     offset += Longs.BYTES;
 
     PublicKey25519Proposition sellerProposition = PublicKey25519PropositionSerializer.getSerializer()
-            .parseBytes(Arrays.copyOf(bytes, PublicKey25519Proposition.getLength()));
+            .parseBytes(Arrays.copyOfRange(bytes, offset, offset + PublicKey25519Proposition.getLength()));
     offset += PublicKey25519Proposition.getLength();
 
-    int year = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    int year = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, offset + Ints.BYTES));
     offset += Ints.BYTES;
 
-    int size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    int size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, offset + Ints.BYTES));
     offset += Ints.BYTES;
 
-    String model = new String(Arrays.copyOfRange(bytes, offset, size));
+    String model = new String(Arrays.copyOfRange(bytes, offset, offset + size));
     offset += size;
 
-    size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, offset + Ints.BYTES));
     offset += Ints.BYTES;
 
-    String color = new String(Arrays.copyOfRange(bytes, offset, size));
+    String color = new String(Arrays.copyOfRange(bytes, offset, offset + size));
     offset += size;
 
-    size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, offset + Ints.BYTES));
     offset += Ints.BYTES;
 
-    String description = new String(Arrays.copyOfRange(bytes, offset, size));
+    String description = new String(Arrays.copyOfRange(bytes, offset, offset + size));
     offset += size;
 
     BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, offset, bytes.length));

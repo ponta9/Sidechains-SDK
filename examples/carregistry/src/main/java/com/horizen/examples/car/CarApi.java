@@ -59,6 +59,7 @@ public class CarApi extends ApplicationApiGroup
 
   private ApiResponse createCar(SidechainNodeView view, CreateCarBoxRequest ent) {
     CarBoxData carBoxData = new CarBoxData(ent.carProposition, 1, ent.vin, ent.year, ent.model, ent.color, ent.description);
+    //CarBoxData carBoxData = new CarBoxData(ent.carProposition, 1, ent.vin, 0, "", "", "");
 
     Optional<Box<Proposition>> inputBoxOpt  = view.getNodeWallet().allBoxes().stream().filter(box -> BytesUtils.toHexString(box.id()).equals(ent.boxId)).findFirst();
     if (!inputBoxOpt.isPresent()) {
