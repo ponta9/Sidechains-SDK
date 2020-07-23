@@ -17,7 +17,6 @@ import java.util.Arrays;
 // creation all required functions are long and take a lot of time, create a python script for it?
 public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition, CarBox, CarBoxData> {
 
-  //TODO add additional attributes
   private final BigInteger vin;
   private final int year;
   private final String model;
@@ -73,18 +72,48 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
   @Override
   public byte[] customFieldsHash()
   {
-    return Blake2b256.hash(vin.toByteArray());
+    return Blake2b256.hash(
+            Bytes.concat(vin.toByteArray(),
+                    Ints.toByteArray(year),
+                    model.getBytes(),
+                    color.getBytes(),
+                    description.getBytes()));
   }
 
   public static CarBoxData parseBytes(byte[] bytes) {
-    int valueOffset = PublicKey25519Proposition.getLength();
-    int activeOffset = valueOffset + Longs.BYTES;
+    int offset = 0;
 
-    PublicKey25519Proposition proposition = PublicKey25519PropositionSerializer.getSerializer().parseBytes(Arrays.copyOf(bytes, valueOffset));
-    long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, valueOffset, activeOffset));
-    BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, activeOffset, bytes.length));
+    PublicKey25519Proposition proposition = PublicKey25519PropositionSerializer.getSerializer()
+            .parseBytes(Arrays.copyOf(bytes, PublicKey25519Proposition.getLength()));
+    offset += PublicKey25519Proposition.getLength();
 
-    return new CarBoxData(proposition, value, vin);
+    long value = Longs.fromByteArray(Arrays.copyOfRange(bytes, offset, Longs.BYTES));
+    offset += Longs.BYTES;
+
+    int year = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    offset += Ints.BYTES;
+
+    int size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    offset += Ints.BYTES;
+
+    String model = new String(Arrays.copyOfRange(bytes, offset, size));
+    offset += size;
+
+    size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    offset += Ints.BYTES;
+
+    String color = new String(Arrays.copyOfRange(bytes, offset, size));
+    offset += size;
+
+    size = Ints.fromByteArray(Arrays.copyOfRange(bytes, offset, Ints.BYTES));
+    offset += Ints.BYTES;
+
+    String description = new String(Arrays.copyOfRange(bytes, offset, size));
+    offset += size;
+
+    BigInteger vin = new BigInteger(Arrays.copyOfRange(bytes, offset, bytes.length));
+
+    return new CarBoxData(proposition, value, vin, year, model, color, description);
   }
 
   @Override
@@ -93,12 +122,33 @@ public class CarBoxData extends AbstractNoncedBoxData<PublicKey25519Proposition,
     return "CarBoxData{" +
         "vin=" + vin + ";" +
         "proposition=" + proposition() +
+        "model=" + model +
+        "color=" + color +
+        "year=" + year +
+        "description=" + description +
         '}';
   }
 
   BigInteger getVin() {
     return vin;
   }
+
+  public int getYear() {
+    return year;
+  }
+
+  public String getModel() {
+    return model;
+  }
+
+  public String getColor() {
+    return color;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
   //Shall be finals in parent?
   /*
   public int hashCode();

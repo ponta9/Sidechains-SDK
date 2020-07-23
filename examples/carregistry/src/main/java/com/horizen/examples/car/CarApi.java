@@ -58,7 +58,7 @@ public class CarApi extends ApplicationApiGroup
   }
 
   private ApiResponse createCar(SidechainNodeView view, CreateCarBoxRequest ent) {
-    CarBoxData carBoxData = new CarBoxData(ent.carProposition, 1, ent.vin);
+    CarBoxData carBoxData = new CarBoxData(ent.carProposition, 1, ent.vin, ent.year, ent.model, ent.color, ent.description);
 
     Optional<Box<Proposition>> inputBoxOpt  = view.getNodeWallet().allBoxes().stream().filter(box -> BytesUtils.toHexString(box.id()).equals(ent.boxId)).findFirst();
     if (!inputBoxOpt.isPresent()) {
@@ -115,7 +115,10 @@ public class CarApi extends ApplicationApiGroup
       inputIds.add(carBox.id());
 
       List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
-      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, ent.sellPrice, carBox.getBoxData().getVin(), carBox.proposition());
+      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, ent.sellPrice,
+              carBox.getBoxData().getVin(), carBox.proposition(),
+              carBox.getBoxData().getYear(), carBox.getBoxData().getModel(),
+              carBox.getBoxData().getColor(), carBox.getBoxData().getDescription());
       outputs.add((NoncedBoxData)carSellOrderData);
 
       List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
@@ -163,7 +166,10 @@ public class CarApi extends ApplicationApiGroup
       inputIds.add(paymentBox.id());
 
       List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
-      CarBoxData carBoxData = new CarBoxData(ent.buyerProposition, 1, carSellOrder.getBoxData().getVin());
+      CarBoxData carBoxData = new CarBoxData(ent.buyerProposition, 1,
+              carSellOrder.getBoxData().getVin(), carSellOrder.getBoxData().getYear(),
+              carSellOrder.getBoxData().getModel(), carSellOrder.getBoxData().getColor(),
+              carSellOrder.getBoxData().getDescription());
       outputs.add((NoncedBoxData)carBoxData);
 
       if (paymentBox.value() < carSellOrder.value())
@@ -202,6 +208,10 @@ public class CarApi extends ApplicationApiGroup
   public static class CreateCarBoxRequest {
     BigInteger vin;
     PublicKey25519Proposition carProposition;
+    int year;
+    String model;
+    String color;
+    String description;
 
     int fee;
     String boxId;
@@ -246,6 +256,38 @@ public class CarApi extends ApplicationApiGroup
     public void setBoxId(String boxIdAsString)
     {
       boxId = boxIdAsString;
+    }
+
+    public int getYear() {
+      return year;
+    }
+
+    public void setYear(int year) {
+      this.year = year;
+    }
+
+    public String getModel() {
+      return model;
+    }
+
+    public void setModel(String model) {
+      this.model = model;
+    }
+
+    public String getColor() {
+      return color;
+    }
+
+    public void setColor(String color) {
+      this.color = color;
+    }
+
+    public String getDescription() {
+      return description;
+    }
+
+    public void setDescription(String description) {
+      this.description = description;
     }
   }
 
