@@ -13,6 +13,9 @@ import com.horizen.box.NoncedBox;
 import com.horizen.box.RegularBox;
 import com.horizen.box.data.NoncedBoxData;
 import com.horizen.box.data.RegularBoxData;
+import com.horizen.companion.SidechainBoxesCompanion;
+import com.horizen.companion.SidechainBoxesDataCompanion;
+import com.horizen.companion.SidechainProofsCompanion;
 import com.horizen.companion.SidechainTransactionsCompanion;
 import com.horizen.node.SidechainNodeView;
 import com.horizen.proof.Proof;
@@ -25,6 +28,7 @@ import com.horizen.transaction.SidechainCoreTransactionFactory;
 import com.horizen.transaction.SidechainTransaction;
 import com.horizen.utils.BytesUtils;
 import org.bouncycastle.pqc.math.linearalgebra.ByteUtils;
+import org.scalacheck.util.CmdLineParser;
 import scala.Option;
 import scala.Some;
 
@@ -39,9 +43,15 @@ public class CarApi extends ApplicationApiGroup
 {
 
   private final SidechainTransactionsCompanion sidechainTransactionsCompanion;
+  private final SidechainBoxesDataCompanion sidechainBoxesDataCompanion;
+  private final SidechainProofsCompanion sidechainProofsCompanion;
 
-  public CarApi(SidechainTransactionsCompanion sidechainTransactionsCompanion) {
+  public CarApi(SidechainTransactionsCompanion sidechainTransactionsCompanion,
+                SidechainBoxesDataCompanion sidechainBoxesDataCompanion,
+                SidechainProofsCompanion sidechainProofsCompanion) {
     this.sidechainTransactionsCompanion = sidechainTransactionsCompanion;
+    this.sidechainBoxesDataCompanion = sidechainBoxesDataCompanion;
+    this.sidechainProofsCompanion = sidechainProofsCompanion;
   }
   @Override
   public String basePath() {
@@ -54,6 +64,7 @@ public class CarApi extends ApplicationApiGroup
     routes.add(bindPostRequest("createCar", this::createCar, CreateCarBoxRequest.class));
     routes.add(bindPostRequest("createCarSellOrder", this::createCarSellOrder, CreateCarSellOrderRequest.class));
     routes.add(bindPostRequest("acceptCarSellOrder", this::acceptCarSellOrder, AcceptCarSellOrderRequest.class));
+    routes.add(bindPostRequest("cancelCarSellOrder", this::cancelCarSellOrder, CancelCarSellOrderRequest.class));
     return routes;
   }
 
@@ -116,7 +127,7 @@ public class CarApi extends ApplicationApiGroup
       inputIds.add(carBox.id());
 
       List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
-      CarSellOrderData carSellOrderData = new CarSellOrderData(ent.proposition, ent.sellPrice,
+      CarSellOrderData carSellOrderData = new CarSellOrderData(carBox.proposition(), ent.sellPrice,
               carBox.getBoxData().getVin(), carBox.proposition(),
               carBox.getBoxData().getYear(), carBox.getBoxData().getModel(),
               carBox.getBoxData().getColor(), carBox.getBoxData().getDescription());
@@ -145,7 +156,7 @@ public class CarApi extends ApplicationApiGroup
       long timestamp = System.currentTimeMillis();
       long fee = 0;
       CarSellOrder carSellOrder = null;
-      RegularBox paymentBox = null;
+      RegularBox inputBox = null;
 
       for (Box b : view.getNodeWallet().boxesOfType(CarSellOrder.class)) {
         if (Arrays.equals(b.id(), BytesUtils.fromHexString(ent.carSellOrderId)))
@@ -157,37 +168,84 @@ public class CarApi extends ApplicationApiGroup
 
       for (Box b : view.getNodeWallet().boxesOfType(RegularBox.class))
         if (Arrays.equals(b.id(), BytesUtils.fromHexString(ent.paymentRegularBoxId)))
-          paymentBox = (RegularBox) b;
+          inputBox = (RegularBox) b;
 
-      if (paymentBox == null)
+      if (inputBox == null)
         throw new IllegalArgumentException("RegularBox to spend is not found.");
 
       List<byte[]> inputIds = new ArrayList<byte[]>();
       inputIds.add(carSellOrder.id());
-      inputIds.add(paymentBox.id());
+      inputIds.add(inputBox.id());
 
-      List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
       CarBoxData carBoxData = new CarBoxData(ent.buyerProposition, 1,
               carSellOrder.getBoxData().getVin(), carSellOrder.getBoxData().getYear(),
               carSellOrder.getBoxData().getModel(), carSellOrder.getBoxData().getColor(),
               carSellOrder.getBoxData().getDescription());
-      outputs.add((NoncedBoxData)carBoxData);
 
-      if (paymentBox.value() < carSellOrder.value())
+      if (inputBox.value() < carSellOrder.value())
         throw new IllegalArgumentException("RegularBox to spend does not contain enough coins.");
 
-      RegularBoxData paymentData = new RegularBoxData(carSellOrder.getBoxData().getSellerProposition(), carSellOrder.value());
-      outputs.add((NoncedBoxData)paymentData);
+      RegularBoxData paymentBoxData = new RegularBoxData(carSellOrder.getBoxData().getSellerProposition(), carSellOrder.value());
 
+      Optional<RegularBoxData> optionalChangeData = Optional.empty();
 
-      if (paymentBox.value() > carSellOrder.value()) {
-        RegularBoxData differenceData = new RegularBoxData(ent.buyerProposition, paymentBox.value() - carSellOrder.value());
-        outputs.add((NoncedBoxData)differenceData);
+      if (inputBox.value() > carSellOrder.value()) {
+        optionalChangeData = Optional.of(new RegularBoxData(ent.buyerProposition, inputBox.value() - carSellOrder.value()));
       }
+
+      List<Proof<Proposition>> fakeProofs = Collections.nCopies(2, null);
+
+      CarSellTransaction unsignedTransaction = new CarSellTransaction(inputIds, carSellOrder.getBoxData(), carBoxData,
+              Optional.of(paymentBoxData), optionalChangeData, fakeProofs, fee, timestamp,
+              sidechainBoxesDataCompanion, sidechainProofsCompanion);
+
+      byte[] messageToSign = unsignedTransaction.messageToSign();
+
+      List<Proof<Proposition>> proofs = new ArrayList<>();
+
+      proofs.add((Proof)new CarBuyerSignature25519(
+              view.getNodeWallet().secretByPublicKey(ent.buyerProposition).get().sign(messageToSign).bytes(),
+              ent.buyerProposition));
+
+      proofs.add(view.getNodeWallet().secretByPublicKey(ent.buyerProposition).get().sign(messageToSign));
+
+      CarSellTransaction transaction = new CarSellTransaction(inputIds, carSellOrder.getBoxData(), carBoxData,
+              Optional.of(paymentBoxData), optionalChangeData, proofs, fee, timestamp,
+              sidechainBoxesDataCompanion, sidechainProofsCompanion);
+
+      return new AcceptCarSellOrderResponce(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction)transaction)));
+    } catch (Exception e) {
+      return new CarResponseError("0103", "Error.", Some.apply(e));
+    }
+  }
+
+  private ApiResponse cancelCarSellOrder(SidechainNodeView view, CancelCarSellOrderRequest ent) {
+    try {
+      long timestamp = System.currentTimeMillis();
+      long fee = 0;
+      CarSellOrder carSellOrder = null;
+
+      for (Box b : view.getNodeWallet().boxesOfType(CarSellOrder.class)) {
+        if (Arrays.equals(b.id(), BytesUtils.fromHexString(ent.carSellOrderId)))
+          carSellOrder = (CarSellOrder) b;
+      }
+
+      if (carSellOrder == null)
+        throw new IllegalArgumentException("CarSellOrder not found.");
+
+      List<byte[]> inputIds = new ArrayList<byte[]>();
+      inputIds.add(carSellOrder.id());
+
+      CarBoxData carBoxData = new CarBoxData(carSellOrder.proposition(), 1,
+              carSellOrder.getBoxData().getVin(), carSellOrder.getBoxData().getYear(),
+              carSellOrder.getBoxData().getModel(), carSellOrder.getBoxData().getColor(),
+              carSellOrder.getBoxData().getDescription());
 
       List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
 
-      SidechainCoreTransaction unsignedTransaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, fakeProofs, fee, timestamp);
+      CarSellTransaction unsignedTransaction = new CarSellTransaction(inputIds, carSellOrder.getBoxData(),
+              carBoxData, Optional.empty(), Optional.empty(), fakeProofs, fee, timestamp,
+              sidechainBoxesDataCompanion, sidechainProofsCompanion);
 
       byte[] messageToSign = unsignedTransaction.messageToSign();
 
@@ -195,12 +253,11 @@ public class CarApi extends ApplicationApiGroup
 
       proofs.add(view.getNodeWallet().secretByPublicKey(carSellOrder.proposition()).get().sign(messageToSign));
 
-      if (paymentBox.value() > carSellOrder.value())
-        proofs.add(view.getNodeWallet().secretByPublicKey(ent.buyerProposition).get().sign(messageToSign));
+      CarSellTransaction transaction = new CarSellTransaction(inputIds, carSellOrder.getBoxData(),
+              carBoxData, Optional.empty(), Optional.empty(), proofs, fee, timestamp,
+              sidechainBoxesDataCompanion, sidechainProofsCompanion);
 
-      SidechainCoreTransaction transaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, proofs, fee, timestamp);
-
-      return new AcceptCarSellOrderResponce(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction)transaction)));
+      return new CancelCarSellOrderResponce(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction)transaction)));
     } catch (Exception e) {
       return new CarResponseError("0103", "Error.", Some.apply(e));
     }
@@ -314,7 +371,6 @@ public class CarApi extends ApplicationApiGroup
 
   public static class CreateCarSellOrderRequest {
     String carBoxId;
-    PublicKey25519Proposition proposition;
     long sellPrice;
 
     public String getCarBoxId()
@@ -325,17 +381,6 @@ public class CarApi extends ApplicationApiGroup
     public void setCarBoxId(String carBoxId)
     {
       this.carBoxId = carBoxId;
-    }
-
-    public PublicKey25519Proposition getProposition()
-    {
-      return proposition;
-    }
-
-    public void setProposition(String propositionHexBytes)
-    {
-      byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
-      proposition = new PublicKey25519Proposition(propositionBytes);
     }
 
     public long getSellPrice() { return sellPrice; }
@@ -396,6 +441,20 @@ public class CarApi extends ApplicationApiGroup
 
   }
 
+  public static class CancelCarSellOrderRequest {
+    String carSellOrderId;
+
+    public String getCarSellOrderId()
+    {
+      return carSellOrderId;
+    }
+
+    public void setCarSellOrderId(String carSellOrderId)
+    {
+      this.carSellOrderId = carSellOrderId;
+    }
+  }
+
   @JsonView(Views.Default.class)
   class AcceptCarSellOrderResponce implements SuccessResponse{
     private final String acceptedCarSellOrderTxBytes;
@@ -408,6 +467,21 @@ public class CarApi extends ApplicationApiGroup
 
     public String getAcceptedCarSellOrderTxBytes() {
       return acceptedCarSellOrderTxBytes;
+    }
+  }
+
+  @JsonView(Views.Default.class)
+  class CancelCarSellOrderResponce implements SuccessResponse{
+    private final String canceledCarSellOrderTxBytes;
+
+    public CancelCarSellOrderResponce(String canceledCarSellOrderTxBytes) {
+      this.canceledCarSellOrderTxBytes = canceledCarSellOrderTxBytes;
+    }
+
+    public String canceledCarSellOrderTxBytes() { return canceledCarSellOrderTxBytes;}
+
+    public String getCanceledCarSellOrderTxBytes() {
+      return canceledCarSellOrderTxBytes;
     }
   }
 

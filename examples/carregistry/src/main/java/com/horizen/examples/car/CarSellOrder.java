@@ -1,13 +1,16 @@
 package com.horizen.examples.car;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
 import com.horizen.box.AbstractNoncedBox;
 import com.horizen.box.BoxSerializer;
 import com.horizen.proposition.PublicKey25519Proposition;
+import com.horizen.serialization.Views;
 
 import java.util.Arrays;
 
+@JsonView(Views.Default.class)
 public class CarSellOrder extends AbstractNoncedBox<PublicKey25519Proposition, CarSellOrderData, CarSellOrder> {
 
   public CarSellOrder(CarSellOrderData boxData, long nonce) {

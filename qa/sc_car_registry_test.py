@@ -142,7 +142,6 @@ class SidechainNodesInitializationTest(SidechainTestFramework):
 
         create_car_sell_order_request = {
 	                "carBoxId": box_of_car[0]["id"],
-	                "proposition": new_public_key,
 	                "sellPrice": "10000"
                     }
 
@@ -193,6 +192,75 @@ class SidechainNodesInitializationTest(SidechainTestFramework):
 
         print("----------------------------------------------------------------------------------------------------")
         print("Transaction of the car sell order acception")
+        print("----------------------------------------------------------------------------------------------------")
+        print(json.dumps(transaction))
+        print("----------------------------------------------------------------------------------------------------")
+
+        responce = sc_node.transaction_sendTransaction(json.dumps(send_transaction))
+        transaction_id = responce["result"]["transactionId"]
+
+        responce = generate_next_blocks(sc_node, "Node 0", 1)
+
+        responce = sc_node.wallet_allBoxes()
+        boxes = responce["result"]["boxes"]
+
+        print("----------------------------------------------------------------------------------------------------")
+        print("Boxes in wallet")
+        print("----------------------------------------------------------------------------------------------------")
+        print(json.dumps(boxes))
+        print("----------------------------------------------------------------------------------------------------")
+
+        box_of_car = filter(lambda b: b["typeId"] == 42, boxes)
+
+        create_car_sell_order_request = {
+	                "carBoxId": box_of_car[0]["id"],
+	                "sellPrice": "10000"
+                    }
+
+        responce = sc_node.carApi_createCarSellOrder(json.dumps(create_car_sell_order_request))
+        car_sell_order_transaction = responce["result"]["carSellOrderTxBytes"]
+
+        send_transaction = {"transactionBytes": car_sell_order_transaction}
+
+        responce = sc_node.transaction_decodeTransactionBytes(json.dumps(send_transaction))
+        transaction = responce["result"]
+
+        print("----------------------------------------------------------------------------------------------------")
+        print("Transaction of the car sell order creation")
+        print("----------------------------------------------------------------------------------------------------")
+        print(json.dumps(transaction))
+        print("----------------------------------------------------------------------------------------------------")
+
+        responce = sc_node.transaction_sendTransaction(json.dumps(send_transaction))
+        transaction_id = responce["result"]["transactionId"]
+
+        responce = generate_next_blocks(sc_node, "Node 0", 1)
+
+        responce = sc_node.wallet_allBoxes()
+        boxes = responce["result"]["boxes"]
+
+        print("----------------------------------------------------------------------------------------------------")
+        print("Boxes in wallet")
+        print("----------------------------------------------------------------------------------------------------")
+        print(json.dumps(boxes))
+        print("----------------------------------------------------------------------------------------------------")
+
+        car_sell_order_box = filter(lambda b: b["typeId"] == 43, boxes)
+
+        cancel_car_sell_order_request = {
+	        "carSellOrderId": car_sell_order_box[0]["id"],
+        }
+
+        responce = sc_node.carApi_cancelCarSellOrder(json.dumps(cancel_car_sell_order_request))
+        cancel_car_sell_order_transaction = responce["result"]["canceledCarSellOrderTxBytes"]
+
+        send_transaction = {"transactionBytes": cancel_car_sell_order_transaction}
+
+        responce = sc_node.transaction_decodeTransactionBytes(json.dumps(send_transaction))
+        transaction = responce["result"]
+
+        print("----------------------------------------------------------------------------------------------------")
+        print("Transaction of the car sell order cancellation")
         print("----------------------------------------------------------------------------------------------------")
         print(json.dumps(transaction))
         print("----------------------------------------------------------------------------------------------------")

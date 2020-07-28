@@ -29,12 +29,6 @@ public class DefaultApplicationState implements ApplicationState {
                 return checkCarSellOrderTransaction(stateReader, transaction);
         }
 
-        for (ByteArrayWrapper id : transaction.boxIdsToOpen()){
-            Box box = stateReader.getClosedBox(id.data()).get();
-            if (box instanceof CarSellOrder)
-                return checkAcceptCarSellOrderTransaction(stateReader, transaction);
-        }
-
         return true;
     }
 
@@ -57,41 +51,6 @@ public class DefaultApplicationState implements ApplicationState {
         }
 
         if (carSellOrderCount != 1)
-            return false;
-
-        return true;
-    }
-
-    private boolean checkAcceptCarSellOrderTransaction (SidechainStateReader stateReader, BoxTransaction<Proposition, Box<Proposition>> transaction) {
-        int carBoxCount = 0;
-        int carSellOrderCount = 0;
-        CarSellOrder carSellOrder = null;
-        CarBox carBox = null;
-        RegularBox paymentBox = null;
-
-        for (ByteArrayWrapper id : transaction.boxIdsToOpen()){
-            Box box = stateReader.getClosedBox(id.data()).get();
-            if (box instanceof CarSellOrder) {
-                carSellOrder = (CarSellOrder) box;
-                carSellOrderCount += 1;
-            }
-        }
-
-        if (carSellOrderCount != 1)
-            return false;
-
-        for (Box box: transaction.newBoxes()) {
-            if (box instanceof CarBox) {
-                carBox = (CarBox)box;
-                carBoxCount += 1;
-            } else if (box instanceof RegularBox && box.proposition().equals(carSellOrder.getBoxData().getSellerProposition()))
-                paymentBox = (RegularBox)box;
-        }
-
-        if (carBoxCount != 1)
-            return false;
-
-        if (paymentBox == null || paymentBox.value() != carSellOrder.value())
             return false;
 
         return true;

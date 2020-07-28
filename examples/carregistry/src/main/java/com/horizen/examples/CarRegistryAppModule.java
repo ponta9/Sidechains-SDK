@@ -10,6 +10,7 @@ import com.horizen.box.BoxSerializer;
 import com.horizen.box.NoncedBox;
 import com.horizen.box.data.NoncedBoxData;
 import com.horizen.box.data.NoncedBoxDataSerializer;
+import com.horizen.companion.SidechainBoxesCompanion;
 import com.horizen.companion.SidechainBoxesDataCompanion;
 import com.horizen.companion.SidechainProofsCompanion;
 import com.horizen.companion.SidechainTransactionsCompanion;
@@ -60,7 +61,17 @@ public class CarRegistryAppModule
 
         HashMap<Byte, SecretSerializer<Secret>> customSecretSerializers = new HashMap<>();
         HashMap<Byte, ProofSerializer<Proof<Proposition>>> customProofSerializers = new HashMap<>();
+
+        customProofSerializers.put((byte)10, (ProofSerializer) CarBuyerSignature25519Serializer.getSerializer());
+
         HashMap<Byte, TransactionSerializer<BoxTransaction<Proposition, Box<Proposition>>>> customTransactionSerializers = new HashMap<>();
+
+        SidechainBoxesDataCompanion sidechainBoxesDataCompanion = new SidechainBoxesDataCompanion(customBoxDataSerializers);
+        SidechainProofsCompanion sidechainProofsCompanion = new SidechainProofsCompanion(customProofSerializers);
+
+        CarSellTransactionSerializer carSellTransactionSerializer = new CarSellTransactionSerializer(sidechainBoxesDataCompanion, sidechainProofsCompanion);
+
+        customTransactionSerializers.put((byte)10, (TransactionSerializer) carSellTransactionSerializer);
 
         ApplicationWallet defaultApplicationWallet = new DefaultApplicationWallet();
         ApplicationState defaultApplicationState = new DefaultApplicationState();
@@ -73,23 +84,21 @@ public class CarRegistryAppModule
         File historyStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/history");
         File consensusStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/consensusData");
 
-
-
         // Here I can add my custom rest api and/or override existing one
         List<ApplicationApiGroup> customApiGroups = new ArrayList<>();
         customApiGroups.add(new CarApi(
                 new SidechainTransactionsCompanion(
                         customTransactionSerializers,
-                        new SidechainBoxesDataCompanion(customBoxDataSerializers),
-                        new SidechainProofsCompanion(customProofSerializers)
-                )));
+                        sidechainBoxesDataCompanion,
+                        sidechainProofsCompanion
+                ),
+                sidechainBoxesDataCompanion,
+                sidechainProofsCompanion));
 
         // Here I can reject some of existing API routes
         // Each pair consists of "group name" -> "route name"
         // For example new Pair("wallet, "allBoxes");
         List<Pair<String, String>> rejectedApiPaths = new ArrayList<>();
-
-
 
         bind(SidechainSettings.class)
                 .annotatedWith(Names.named("SidechainSettings"))

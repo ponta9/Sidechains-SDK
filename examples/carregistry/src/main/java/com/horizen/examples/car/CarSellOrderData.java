@@ -1,5 +1,6 @@
 package com.horizen.examples.car;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
@@ -7,11 +8,13 @@ import com.horizen.box.data.AbstractNoncedBoxData;
 import com.horizen.box.data.NoncedBoxDataSerializer;
 import com.horizen.proposition.PublicKey25519Proposition;
 import com.horizen.proposition.PublicKey25519PropositionSerializer;
+import com.horizen.serialization.Views;
 import scorex.crypto.hash.Blake2b256;
 
 import java.math.BigInteger;
 import java.util.Arrays;
 
+@JsonView(Views.Default.class)
 public class CarSellOrderData extends AbstractNoncedBoxData<PublicKey25519Proposition, CarSellOrder, CarSellOrderData> {
 
   private final PublicKey25519Proposition sellerProposition;
