@@ -1,5 +1,6 @@
 package com.horizen.examples.car.box;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
@@ -16,6 +17,7 @@ import java.util.Arrays;
 import static com.horizen.examples.car.box.CarRegistryBoxesIdsEnum.CarBoxId;
 
 @JsonView(Views.Default.class)
+@JsonIgnoreProperties({"carId", "value"})
 public final class CarBox extends AbstractNoncedBox<PublicKey25519Proposition, CarBoxData, CarBox> {
 
     public CarBox(CarBoxData boxData, long nonce) {

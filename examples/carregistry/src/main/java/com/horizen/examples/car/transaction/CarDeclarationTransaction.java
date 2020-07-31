@@ -37,6 +37,7 @@ public final class CarDeclarationTransaction extends AbstractRegularTransaction 
         super(inputRegularBoxIds, inputRegularBoxProofs, outputRegularBoxesData, fee, timestamp);
         this.outputCarBoxData = outputCarBoxData;
     }
+    
     @Override
     public byte transactionTypeId() {
         return CarDeclarationTransactionId.id();
@@ -48,7 +49,6 @@ public final class CarDeclarationTransaction extends AbstractRegularTransaction 
             newBoxes = new ArrayList<>(super.newBoxes());
             long nonce = getNewBoxNonce(outputCarBoxData.proposition(), newBoxes.size());
             newBoxes.add((NoncedBox) new CarBox(outputCarBoxData, nonce));
-
         }
         return Collections.unmodifiableList(newBoxes);
     }

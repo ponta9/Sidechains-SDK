@@ -83,8 +83,11 @@ public final class CarSellOrderInfo {
         long price = BytesUtils.getLong(bytes, offset);
         offset += 8;
 
+        batchSize = BytesUtils.getInt(bytes, offset);
+        offset += 4;
+
         PublicKey25519Proposition buyerProposition = PublicKey25519PropositionSerializer.getSerializer()
-                .parseBytes(Arrays.copyOfRange(bytes, offset, bytes.length));
+                .parseBytes(Arrays.copyOfRange(bytes, offset, offset + batchSize));
 
         return new CarSellOrderInfo(carBoxToOpen, proof, price, buyerProposition);
     }

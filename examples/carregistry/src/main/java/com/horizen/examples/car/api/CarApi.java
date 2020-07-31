@@ -14,12 +14,15 @@ import com.horizen.companion.SidechainBoxesDataCompanion;
 import com.horizen.companion.SidechainProofsCompanion;
 import com.horizen.companion.SidechainTransactionsCompanion;
 import com.horizen.examples.car.api.request.CreateCarBoxRequest;
+import com.horizen.examples.car.api.request.CreateCarSellOrderRequest;
 import com.horizen.examples.car.box.CarBox;
 import com.horizen.examples.car.box.CarSellOrderBox;
 import com.horizen.examples.car.box.data.CarBoxData;
 import com.horizen.examples.car.box.data.CarSellOrderBoxData;
+import com.horizen.examples.car.info.CarSellOrderInfo;
 import com.horizen.examples.car.proposition.SellOrderProposition;
 import com.horizen.examples.car.transaction.CarDeclarationTransaction;
+import com.horizen.examples.car.transaction.SellCarTransaction;
 import com.horizen.node.NodeMemoryPool;
 import com.horizen.node.SidechainNodeView;
 import com.horizen.proof.Proof;
@@ -81,78 +84,78 @@ public class CarApi extends ApplicationApiGroup {
       Returns the hex representation of the transaction.
     */
     private ApiResponse createCar(SidechainNodeView view, CreateCarBoxRequest ent) {
+        try {
+            PublicKey25519Proposition carOwnershipProposition = PublicKey25519PropositionSerializer.getSerializer()
+                    .parseBytes(BytesUtils.fromHexString(ent.proposition));
 
-        PublicKey25519Proposition carOwnershipProposition = PublicKey25519PropositionSerializer.getSerializer().parseBytes(BytesUtils.fromHexString(ent.proposition));
+            CarBoxData carBoxData = new CarBoxData(carOwnershipProposition, ent.vin, ent.year, ent.model, ent.color);
 
-        CarBoxData carBoxData = new CarBoxData(carOwnershipProposition, ent.vin, ent.year, ent.model, ent.color);
+            List<Box<Proposition>> paymentBoxes = new ArrayList<>();
+            long amountToPay = ent.fee;
 
-        List<byte[]> boxIdsToExclude = boxesFromMempool(view.getNodeMemoryPool());
+            List<byte[]> boxIdsToExclude = boxesFromMempool(view.getNodeMemoryPool());
+            List<Box<Proposition>> regularBoxes = view.getNodeWallet().boxesOfType(RegularBox.class, boxIdsToExclude);
+            int index = 0;
+            while (amountToPay > 0 && index < regularBoxes.size()) {
+                paymentBoxes.add(regularBoxes.get(index));
+                amountToPay -= regularBoxes.get(index).value();
+                index++;
+            }
 
-        List<Box<Proposition>> paymentBoxes = new ArrayList<>();
+            if (amountToPay > 0) {
+                throw new IllegalStateException("Not enough coins to pay the fee.");
+            }
 
-        long amountToPay = ent.fee;
+            long change = Math.abs(amountToPay);
+            List<RegularBoxData> regularOutputs = new ArrayList<>();
+            if (change > 0)
+                regularOutputs.add(new RegularBoxData((PublicKey25519Proposition) paymentBoxes.get(0).proposition(), change));
 
-        List<Box<Proposition>> regularBoxes = view.getNodeWallet().boxesOfType(RegularBox.class, boxIdsToExclude);
-        int index = 0;
-        while(amountToPay > 0 && index < regularBoxes.size()) {
-            paymentBoxes.add(regularBoxes.get(index));
-            amountToPay -= regularBoxes.get(index).value();
-            index++;
+            List<byte[]> inputIds = new ArrayList<>();
+            for (Box b : paymentBoxes)
+                inputIds.add(b.id());
+
+            List fakeProofs = Collections.nCopies(inputIds.size(), null);
+            Long timestamp = System.currentTimeMillis();
+
+            CarDeclarationTransaction unsignedTransaction = new CarDeclarationTransaction(
+                    inputIds,
+                    fakeProofs,
+                    regularOutputs,
+                    carBoxData,
+                    ent.fee,
+                    timestamp);
+
+            byte[] messageToSign = unsignedTransaction.messageToSign();
+            List<Signature25519> proofs = new ArrayList<>();
+            for (Box<Proposition> box : paymentBoxes) {
+                proofs.add((Signature25519) view.getNodeWallet().secretByPublicKey(box.proposition()).get().sign(messageToSign));
+            }
+
+            CarDeclarationTransaction signedTransaction = new CarDeclarationTransaction(
+                    inputIds,
+                    proofs,
+                    regularOutputs,
+                    carBoxData,
+                    ent.fee,
+                    timestamp);
+
+            return new CarResponse(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction) signedTransaction)));
         }
-
-        if(amountToPay > 0) {
-            return new CarResponseError("0100", "Not enough coins to buy the car.", Option.empty()); //change API response to use java optional
+        catch (Exception e) {
+            return new CarResponseError("0102", "Error during Car declaration.", Some.apply(e));
         }
-
-        long change = Math.abs(amountToPay);
-        List<RegularBoxData> regularOutputs = new ArrayList<>();
-        if(change > 0)
-            regularOutputs.add(new RegularBoxData((PublicKey25519Proposition) paymentBoxes.get(0).proposition(), change));
-
-        List<byte[]> inputIds = new ArrayList<>();
-        for(Box b : paymentBoxes)
-            inputIds.add(b.id());
-
-        List fakeProofs = Collections.nCopies(inputIds.size(), null);
-        Long timestamp = System.currentTimeMillis();
-
-        CarDeclarationTransaction unsignedTransaction = new CarDeclarationTransaction(
-                inputIds,
-                fakeProofs,
-                regularOutputs,
-                carBoxData,
-                ent.fee,
-                timestamp);
-
-        byte[] messageToSign = unsignedTransaction.messageToSign();
-        List<Signature25519> proofs = new ArrayList<>();
-        for(Box<Proposition> box : paymentBoxes) {
-            proofs.add((Signature25519)view.getNodeWallet().secretByPublicKey(box.proposition()).get().sign(messageToSign));
-        }
-
-        CarDeclarationTransaction signedTransaction = new CarDeclarationTransaction(
-                inputIds,
-                proofs,
-                regularOutputs,
-                carBoxData,
-                ent.fee,
-                timestamp);
-
-        return new CarResponse(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction) signedTransaction)));
     }
 
     /*
       Route to create car sell order.
-      Input parameters are Car Box and sell price.
-      Route checks if car box exists and then creates Sidechain Core transaction.
-      Output of this transaction is new Car Sell Order.
-      Hex representation of new transaction is returned.
+      Input parameters are Car Box id, sell price and fee amount to pay.
+      Route checks if car box exists and then creates SellCarTransaction.
+      Output of this transaction is new Car Sell Order token.
+      Returns the hex representation of the transaction.
     */
     private ApiResponse createCarSellOrder(SidechainNodeView view, CreateCarSellOrderRequest ent) {
-        return new CarResponse("");
-        /*
         try {
-            long timestamp = System.currentTimeMillis();
             CarBox carBox = null;
 
             for (Box b : view.getNodeWallet().boxesOfType(CarBox.class)) {
@@ -161,38 +164,78 @@ public class CarApi extends ApplicationApiGroup {
             }
 
             if (carBox == null)
-                throw new IllegalArgumentException("CarBox not found.");
+                throw new IllegalArgumentException("CarBox with given box id not found.");
 
-            List<byte[]> inputIds = new ArrayList<>();
-            inputIds.add(carBox.id());
+            PublicKey25519Proposition carBuyerProposition = PublicKey25519PropositionSerializer.getSerializer()
+                    .parseBytes(BytesUtils.fromHexString(ent.buyerProposition));
 
-            List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList<>();
-            CarSellOrderBoxData carSellOrderBoxData = new CarSellOrderBoxData(
-                    new SellOrderProposition(carBox.proposition().pubKeyBytes()),
-                    ent.sellPrice,
-                    carBox.getVin(),
-                    carBox.getYear(),
-                    carBox.getModel(),
-                    carBox.getColor(),
-                    carBox.getDescription());
-            outputs.add((NoncedBoxData) carSellOrderBoxData);
+            // Get Regular boxes to pay fee
+            List<Box<Proposition>> paymentBoxes = new ArrayList<>();
+            long amountToPay = ent.fee;
 
-            List<Proof<Proposition>> fakeProofs = Collections.nCopies(inputIds.size(), null);
+            List<byte[]> boxIdsToExclude = boxesFromMempool(view.getNodeMemoryPool());
+            List<Box<Proposition>> regularBoxes = view.getNodeWallet().boxesOfType(RegularBox.class, boxIdsToExclude);
+            int index = 0;
+            while (amountToPay > 0 && index < regularBoxes.size()) {
+                paymentBoxes.add(regularBoxes.get(index));
+                amountToPay -= regularBoxes.get(index).value();
+                index++;
+            }
 
-            SidechainCoreTransaction unsignedTransaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, fakeProofs, ent.fee, timestamp);
+            if (amountToPay > 0) {
+                throw new IllegalStateException("Not enough coins to pay the fee.");
+            }
+
+            long change = Math.abs(amountToPay);
+            List<RegularBoxData> regularOutputs = new ArrayList<>();
+            if (change > 0)
+                regularOutputs.add(new RegularBoxData((PublicKey25519Proposition) paymentBoxes.get(0).proposition(), change));
+
+            List<byte[]> inputRegularBoxIds = new ArrayList<>();
+            for (Box b : paymentBoxes)
+                inputRegularBoxIds.add(b.id());
+
+            CarSellOrderInfo fakeSaleOrderInfo = new CarSellOrderInfo(carBox, null, ent.sellPrice, carBuyerProposition);
+
+
+            List<Signature25519> fakeRegularInputProofs = Collections.nCopies(inputRegularBoxIds.size(), null);
+            Long timestamp = System.currentTimeMillis();
+
+            SellCarTransaction unsignedTransaction = new SellCarTransaction(
+                    inputRegularBoxIds,
+                    fakeRegularInputProofs,
+                    regularOutputs,
+                    fakeSaleOrderInfo,
+                    ent.fee,
+                    timestamp);
 
             byte[] messageToSign = unsignedTransaction.messageToSign();
+            List<Signature25519> regularInputProofs = new ArrayList<>();
 
-            List<Proof<Proposition>> proofs = new ArrayList<>();
+            for (Box<Proposition> box : paymentBoxes) {
+                regularInputProofs.add((Signature25519) view.getNodeWallet().secretByPublicKey(box.proposition()).get().sign(messageToSign));
+            }
 
-            proofs.add(view.getNodeWallet().secretByPublicKey(carBox.proposition()).get().sign(messageToSign));
+            CarSellOrderInfo saleOrderInfo = new CarSellOrderInfo(
+                    carBox,
+                    (Signature25519)view.getNodeWallet().secretByPublicKey(carBox.proposition()).get().sign(messageToSign),
+                    ent.sellPrice,
+                    carBuyerProposition);
 
-            SidechainCoreTransaction transaction = getSidechainCoreTransactionFactory().create(inputIds, outputs, proofs, ent.fee, timestamp);
+
+            SellCarTransaction transaction = new SellCarTransaction(
+                    inputRegularBoxIds,
+                    regularInputProofs,
+                    regularOutputs,
+                    saleOrderInfo,
+                    ent.fee,
+                    timestamp);
 
             return new CreateCarSellOrderResponce(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction) transaction)));
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             return new CarResponseError("0102", "Error during Car Sell Order creation.", Some.apply(e));
-        }*/
+        }
     }
 
     /*
@@ -344,36 +387,6 @@ public class CarApi extends ApplicationApiGroup {
 
         public CarResponse(String transactionBytes) {
             this.transactionBytes = transactionBytes;
-        }
-    }
-
-    public static class CreateCarSellOrderRequest {
-        String carBoxId;
-        long sellPrice;
-        long fee;
-
-        public String getCarBoxId() {
-            return carBoxId;
-        }
-
-        public void setCarBoxId(String carBoxId) {
-            this.carBoxId = carBoxId;
-        }
-
-        public long getSellPrice() {
-            return sellPrice;
-        }
-
-        public void setSellPrice(long sellPrice) {
-            this.sellPrice = sellPrice;
-        }
-
-        public long getFee() {
-            return fee;
-        }
-
-        public void setFee(int fee) {
-            this.fee = fee;
         }
     }
 
