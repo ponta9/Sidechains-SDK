@@ -17,6 +17,7 @@ import scorex.core.NodeViewModifier$;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static com.horizen.examples.car.transaction.CarRegistryTransactionsIdsEnum.CarDeclarationTransactionId;
@@ -24,6 +25,8 @@ import static com.horizen.examples.car.transaction.CarRegistryTransactionsIdsEnu
 public final class CarDeclarationTransaction extends AbstractRegularTransaction {
 
     private CarBoxData outputCarBoxData;
+
+    private List<NoncedBox<Proposition>> newBoxes;
 
     public CarDeclarationTransaction(List<byte[]> inputRegularBoxIds,
                                      List<Signature25519> inputRegularBoxProofs,
@@ -40,12 +43,14 @@ public final class CarDeclarationTransaction extends AbstractRegularTransaction 
     }
 
     @Override
-    public List<NoncedBox<Proposition>> newBoxes() {
-        List<NoncedBox<Proposition>> newBoxes = super.newBoxes();
-        long nonce = getNewBoxNonce(outputCarBoxData.proposition(), newBoxes.size());
-        newBoxes.add((NoncedBox)new CarBox(outputCarBoxData, nonce));
+    public synchronized List<NoncedBox<Proposition>> newBoxes() {
+        if(newBoxes == null) {
+            newBoxes = new ArrayList<>(super.newBoxes());
+            long nonce = getNewBoxNonce(outputCarBoxData.proposition(), newBoxes.size());
+            newBoxes.add((NoncedBox) new CarBox(outputCarBoxData, nonce));
 
-        return newBoxes;
+        }
+        return Collections.unmodifiableList(newBoxes);
     }
 
     @Override

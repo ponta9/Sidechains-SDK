@@ -98,11 +98,7 @@ sidechainclient_processes = {}
 def launch_bootstrap_tool(command_name, json_parameters):
     json_param = json.dumps(json_parameters)
     java_ps = subprocess.Popen(["java", "-jar",
-<<<<<<< HEAD
-                               "../tools/sctool/target/Sidechains-SDK-ScBootstrappingTools-0.2.0-SNAPSHOT.jar",
-=======
                                "../tools/sctool/target/Sidechains-SDK-ScBootstrappingTools-0.2.1.jar",
->>>>>>> dev
                                command_name, json_param], stdout=subprocess.PIPE)
     sc_bootstrap_output = java_ps.communicate()[0]
     jsone_node = json.loads(sc_bootstrap_output)
@@ -346,11 +342,7 @@ def start_sc_node(i, dirname, extra_args=None, rpchost=None, timewait=None, bina
         lib_separator = ";"
 
     if binary is None:
-<<<<<<< HEAD
-        binary = "../examples/simpleapp/target/Sidechains-SDK-simpleapp-0.2.0-SNAPSHOT.jar" + lib_separator + "../examples/simpleapp/target/lib/* com.horizen.examples.SimpleApp"
-=======
         binary = "../examples/simpleapp/target/Sidechains-SDK-simpleapp-0.2.1.jar" + lib_separator + "../examples/simpleapp/target/lib/* com.horizen.examples.SimpleApp"
->>>>>>> dev
     #        else if platform.system() == 'Linux':
     bashcmd = 'java -cp ' + binary + " " + (datadir + ('/node%s.conf' % i))
     sidechainclient_processes[i] = subprocess.Popen(bashcmd.split())

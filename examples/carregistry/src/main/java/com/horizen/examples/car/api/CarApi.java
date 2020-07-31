@@ -13,18 +13,24 @@ import com.horizen.box.data.RegularBoxData;
 import com.horizen.companion.SidechainBoxesDataCompanion;
 import com.horizen.companion.SidechainProofsCompanion;
 import com.horizen.companion.SidechainTransactionsCompanion;
+import com.horizen.examples.car.api.request.CreateCarBoxRequest;
 import com.horizen.examples.car.box.CarBox;
 import com.horizen.examples.car.box.CarSellOrderBox;
 import com.horizen.examples.car.box.data.CarBoxData;
 import com.horizen.examples.car.box.data.CarSellOrderBoxData;
 import com.horizen.examples.car.proposition.SellOrderProposition;
+import com.horizen.examples.car.transaction.CarDeclarationTransaction;
+import com.horizen.node.NodeMemoryPool;
 import com.horizen.node.SidechainNodeView;
 import com.horizen.proof.Proof;
+import com.horizen.proof.Signature25519;
 import com.horizen.proposition.Proposition;
 import com.horizen.proposition.PublicKey25519Proposition;
+import com.horizen.proposition.PublicKey25519PropositionSerializer;
 import com.horizen.serialization.Views;
 import com.horizen.transaction.BoxTransaction;
 import com.horizen.transaction.SidechainCoreTransaction;
+import com.horizen.utils.ByteArrayWrapper;
 import com.horizen.utils.BytesUtils;
 import org.bouncycastle.pqc.math.linearalgebra.ByteUtils;
 import scala.Option;
@@ -69,51 +75,70 @@ public class CarApi extends ApplicationApiGroup {
 
     /*
       Route to create car (register new car in the Sidechain).
-      Input parameters are car properties and regular box to pay fee.
-      Route checks if regular box to pay fee exists and then creates Sidechain Core transaction.
-      Output of this transaction is new Car Box.
-      Hex representation of new transaction is returned.
+      Input parameters are car properties and fee amount to pay.
+      Route checks if the is enough regular box balance to pay fee and then creates CarDeclarationTransaction.
+      Output of this transaction is new Car Box token.
+      Returns the hex representation of the transaction.
     */
     private ApiResponse createCar(SidechainNodeView view, CreateCarBoxRequest ent) {
-        return new CarResponse("");
-        /*
-        CarBoxData carBoxData = new CarBoxData(ent.carProposition, ent.vin, ent.year, ent.model, ent.color, ent.description);
 
-        Optional<Box<Proposition>> inputBoxOpt = view.getNodeWallet().boxesOfType(RegularBox.class).stream().filter(box -> BytesUtils.toHexString(box.id()).equals(ent.boxId)).findFirst();
-        if (!inputBoxOpt.isPresent()) {
-            return new CarResponseError("0100", "Box for paying fee is not found", Option.empty()); //change API response to use java optional
+        PublicKey25519Proposition carOwnershipProposition = PublicKey25519PropositionSerializer.getSerializer().parseBytes(BytesUtils.fromHexString(ent.proposition));
+
+        CarBoxData carBoxData = new CarBoxData(carOwnershipProposition, ent.vin, ent.year, ent.model, ent.color);
+
+        List<byte[]> boxIdsToExclude = boxesFromMempool(view.getNodeMemoryPool());
+
+        List<Box<Proposition>> paymentBoxes = new ArrayList<>();
+
+        long amountToPay = ent.fee;
+
+        List<Box<Proposition>> regularBoxes = view.getNodeWallet().boxesOfType(RegularBox.class, boxIdsToExclude);
+        int index = 0;
+        while(amountToPay > 0 && index < regularBoxes.size()) {
+            paymentBoxes.add(regularBoxes.get(index));
+            amountToPay -= regularBoxes.get(index).value();
+            index++;
         }
 
-        Box<Proposition> inputBox = inputBoxOpt.get();
-
-        long change = inputBox.value() - ent.fee;
-        if (change < 0) {
-            return new CarResponseError("0101", "Box for paying fee doesn't have enough coins to pay the fee", Option.empty()); //change API response to use java optional
+        if(amountToPay > 0) {
+            return new CarResponseError("0100", "Not enough coins to buy the car.", Option.empty()); //change API response to use java optional
         }
 
-        NoncedBoxData output = new RegularBoxData((PublicKey25519Proposition) inputBox.proposition(), change);
+        long change = Math.abs(amountToPay);
+        List<RegularBoxData> regularOutputs = new ArrayList<>();
+        if(change > 0)
+            regularOutputs.add(new RegularBoxData((PublicKey25519Proposition) paymentBoxes.get(0).proposition(), change));
 
+        List<byte[]> inputIds = new ArrayList<>();
+        for(Box b : paymentBoxes)
+            inputIds.add(b.id());
 
-        List<byte[]> inputIds = Collections.singletonList(BytesUtils.fromHexString(ent.boxId));
-        Long timestamp = System.currentTimeMillis();
         List fakeProofs = Collections.nCopies(inputIds.size(), null);
+        Long timestamp = System.currentTimeMillis();
 
-        List<NoncedBoxData<Proposition, NoncedBox<Proposition>>> outputs = new ArrayList();
+        CarDeclarationTransaction unsignedTransaction = new CarDeclarationTransaction(
+                inputIds,
+                fakeProofs,
+                regularOutputs,
+                carBoxData,
+                ent.fee,
+                timestamp);
 
-        outputs.add(output);
-        outputs.add((NoncedBoxData) carBoxData);
-
-        SidechainCoreTransaction unsignedTransaction =
-                getSidechainCoreTransactionFactory().create(inputIds, outputs, fakeProofs, ent.fee, timestamp);
         byte[] messageToSign = unsignedTransaction.messageToSign();
+        List<Signature25519> proofs = new ArrayList<>();
+        for(Box<Proposition> box : paymentBoxes) {
+            proofs.add((Signature25519)view.getNodeWallet().secretByPublicKey(box.proposition()).get().sign(messageToSign));
+        }
 
-        Proof proof = view.getNodeWallet().secretByPublicKey(inputBox.proposition()).get().sign(messageToSign);
+        CarDeclarationTransaction signedTransaction = new CarDeclarationTransaction(
+                inputIds,
+                proofs,
+                regularOutputs,
+                carBoxData,
+                ent.fee,
+                timestamp);
 
-        SidechainCoreTransaction signedTransaction =
-                getSidechainCoreTransactionFactory().create(inputIds, outputs, Collections.singletonList(proof), ent.fee, timestamp);
-
-        CarResponse result = new CarResponse(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction) signedTransaction)));
-        return result;*/
+        return new CarResponse(ByteUtils.toHexString(sidechainTransactionsCompanion.toBytes((BoxTransaction) signedTransaction)));
     }
 
     /*
@@ -313,98 +338,12 @@ public class CarApi extends ApplicationApiGroup {
         }*/
     }
 
-    public static class CreateCarBoxRequest {
-        String vin;
-        PublicKey25519Proposition carProposition;
-        int year;
-        String model;
-        String color;
-        String description;
-
-        long fee;
-        String boxId;
-
-
-        public String getVin() {
-            return vin;
-        }
-
-        public void setVin(String vin) {
-            this.vin = vin;
-        }
-
-        public PublicKey25519Proposition getCarProposition() {
-            return carProposition;
-        }
-
-        public void setCarProposition(String propositionHexBytes) {
-            byte[] propositionBytes = BytesUtils.fromHexString(propositionHexBytes);
-            carProposition = new PublicKey25519Proposition(propositionBytes);
-        }
-
-        public long getFee() {
-            return fee;
-        }
-
-        public void setFee(long fee) {
-            this.fee = fee;
-        }
-
-        public String getBoxId() {
-            return boxId;
-        }
-
-        public void setBoxId(String boxIdAsString) {
-            boxId = boxIdAsString;
-        }
-
-        public int getYear() {
-            return year;
-        }
-
-        public void setYear(int year) {
-            this.year = year;
-        }
-
-        public String getModel() {
-            return model;
-        }
-
-        public void setModel(String model) {
-            this.model = model;
-        }
-
-        public String getColor() {
-            return color;
-        }
-
-        public void setColor(String color) {
-            this.color = color;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public void setDescription(String description) {
-            this.description = description;
-        }
-    }
-
     @JsonView(Views.Default.class)
     class CarResponse implements SuccessResponse {
-        private final String createCarTxBytes;
+        public String transactionBytes;
 
-        public CarResponse(String createCarTxBytes) {
-            this.createCarTxBytes = createCarTxBytes;
-        }
-
-        public String carTxBytes() {
-            return createCarTxBytes;
-        }
-
-        public String getCreateCarTxBytes() {
-            return createCarTxBytes;
+        public CarResponse(String transactionBytes) {
+            this.transactionBytes = transactionBytes;
         }
     }
 
@@ -549,6 +488,17 @@ public class CarApi extends ApplicationApiGroup {
         public Option<Throwable> exception() {
             return null;
         }
+    }
+
+    private List<byte[]> boxesFromMempool(NodeMemoryPool mempool) {
+        List<byte[]> boxesFromMempool = new ArrayList<>();
+        for(BoxTransaction tx : mempool.getTransactions()) {
+            Set<ByteArrayWrapper> ids = tx.boxIdsToOpen();
+            for(ByteArrayWrapper id : ids) {
+                boxesFromMempool.add(id.data());
+            }
+        }
+        return boxesFromMempool;
     }
 }
 

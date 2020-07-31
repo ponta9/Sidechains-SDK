@@ -19,6 +19,7 @@ import scorex.core.NodeViewModifier$;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static com.horizen.examples.car.transaction.CarRegistryTransactionsIdsEnum.BuyCarTransactionId;
@@ -26,6 +27,8 @@ import static com.horizen.examples.car.transaction.CarRegistryTransactionsIdsEnu
 public final class BuyCarTransaction extends AbstractRegularTransaction {
 
     private CarBuyOrderInfo carBuyOrderInfo;
+
+    private List<NoncedBox<Proposition>> newBoxes;
 
     public BuyCarTransaction(List<byte[]> inputRegularBoxIds,
                               List<Signature25519> inputRegularBoxProofs,
@@ -63,19 +66,21 @@ public final class BuyCarTransaction extends AbstractRegularTransaction {
 
     @Override
     public List<NoncedBox<Proposition>> newBoxes() {
-        List<NoncedBox<Proposition>> newBoxes = super.newBoxes();
+        if(newBoxes == null) {
+            newBoxes = new ArrayList<>(super.newBoxes());
 
-        long nonce = getNewBoxNonce(carBuyOrderInfo.getNewOwnerCarBoxData().proposition(), newBoxes.size());
-        newBoxes.add((NoncedBox)new CarBox(carBuyOrderInfo.getNewOwnerCarBoxData(), nonce));
+            long nonce = getNewBoxNonce(carBuyOrderInfo.getNewOwnerCarBoxData().proposition(), newBoxes.size());
+            newBoxes.add((NoncedBox) new CarBox(carBuyOrderInfo.getNewOwnerCarBoxData(), nonce));
 
-        // If Sell Order was opened by the buyer -> add payment box for Car previous owner
-        if(!carBuyOrderInfo.isSpentByOwner()) {
-            RegularBoxData paymentBoxData = carBuyOrderInfo.getPaymentBoxData();
-            nonce = getNewBoxNonce(paymentBoxData.proposition(), newBoxes.size());
-            newBoxes.add((NoncedBox)new RegularBox(paymentBoxData, nonce));
+            // If Sell Order was opened by the buyer -> add payment box for Car previous owner
+            if (!carBuyOrderInfo.isSpentByOwner()) {
+                RegularBoxData paymentBoxData = carBuyOrderInfo.getPaymentBoxData();
+                nonce = getNewBoxNonce(paymentBoxData.proposition(), newBoxes.size());
+                newBoxes.add((NoncedBox) new RegularBox(paymentBoxData, nonce));
+            }
         }
+        return Collections.unmodifiableList(newBoxes);
 
-        return newBoxes;
     }
 
     @Override

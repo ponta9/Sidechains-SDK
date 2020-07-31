@@ -14,6 +14,7 @@ import com.horizen.utils.ListSerializer;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public abstract class AbstractRegularTransaction extends SidechainTransaction<Proposition, NoncedBox<Proposition>> {
@@ -29,6 +30,8 @@ public abstract class AbstractRegularTransaction extends SidechainTransaction<Pr
             new ListSerializer<>(Signature25519Serializer.getSerializer(), MAX_TRANSACTION_UNLOCKERS);
     protected static ListSerializer<RegularBoxData> regularBoxDataListSerializer =
             new ListSerializer<>(RegularBoxDataSerializer.getSerializer(), MAX_TRANSACTION_NEW_BOXES);
+
+    private List<NoncedBox<Proposition>> newBoxes;
 
     public AbstractRegularTransaction(List<byte[]> inputRegularBoxIds,
 
@@ -71,13 +74,15 @@ public abstract class AbstractRegularTransaction extends SidechainTransaction<Pr
 
     @Override
     public List<NoncedBox<Proposition>> newBoxes() {
-        List<NoncedBox<Proposition>> newBoxes = new ArrayList<>();
-        for (int i = 0; i < outputRegularBoxesData.size(); i++) {
-            long nonce = getNewBoxNonce(outputRegularBoxesData.get(i).proposition(), i);
-            RegularBoxData boxData = outputRegularBoxesData.get(i);
-            newBoxes.add((NoncedBox)new RegularBox(boxData, nonce));
+        if(newBoxes == null) {
+            newBoxes = new ArrayList<>();
+            for (int i = 0; i < outputRegularBoxesData.size(); i++) {
+                long nonce = getNewBoxNonce(outputRegularBoxesData.get(i).proposition(), i);
+                RegularBoxData boxData = outputRegularBoxesData.get(i);
+                newBoxes.add((NoncedBox) new RegularBox(boxData, nonce));
+            }
         }
-        return newBoxes;
+        return Collections.unmodifiableList(newBoxes);
     }
 
     @Override

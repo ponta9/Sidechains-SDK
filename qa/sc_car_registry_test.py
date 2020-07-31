@@ -31,7 +31,7 @@ class SidechainNodesInitializationTest(SidechainTestFramework):
         if sys.platform.startswith('win'):
             lib_separator = ";"
 
-        binary = "../examples/carregistry/target/Sidechains-SDK-carregistry-0.2.0-SNAPSHOT.jar" + \
+        binary = "../examples/carregistry/target/Sidechains-SDK-carregistry-0.2.1.jar" + \
                  lib_separator + "../examples/carregistry/target/lib/* com.horizen.examples.CarRegistryApp"
 
         tmpdir = "../examples/carregistry/target/tmp"

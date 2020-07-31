@@ -18,21 +18,13 @@ Otherwise, to run SimpleApp outside the IDE:
 2. Go to the project root directory and execute in a command line:
     * (Windows)
         ```
-<<<<<<< HEAD
-        java -cp ./examples/simpleapp/target/Sidechains-SDK-simpleapp-0.2.0.jar;./examples/simpleapp/target/lib/* com.horizen.examples.SimpleApp <path_to_config_file>
-=======
         cd Sidechains-SDK\examples\simpleapp
         java -cp ./target/Sidechains-SDK-simpleapp-0.2.1.jar;./target/lib/* com.horizen.examples.SimpleApp <path_to_config_file>
->>>>>>> dev
         ```
     * (Linux)
         ```
-<<<<<<< HEAD
-        java -cp ./examples/simpleapp/target/Sidechains-SDK-simpleapp-0.2.0.jar:./examples/simpleapp/target/lib/* com.horizen.examples.SimpleApp <path_to_config_file>
-=======
         cd ./Sidechains-SDK/examples/simpleapp
         java -cp ./target/Sidechains-SDK-simpleapp-0.2.1.jar:./target/lib/* com.horizen.examples.SimpleApp <path_to_config_file>
->>>>>>> dev
         ```
 
     
