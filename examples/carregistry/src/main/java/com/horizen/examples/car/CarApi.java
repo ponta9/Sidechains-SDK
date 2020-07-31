@@ -68,9 +68,15 @@ public class CarApi extends ApplicationApiGroup
     return routes;
   }
 
+  /*
+  Route to create car (register new car in the Sidechain).
+  Input parameters are car properties and regular box to pay fee.
+  Route checks if regular box to pay fee exists and then creates Sidechain Core transaction.
+  Output of this transaction is new Car Box.
+  Hex representation of new transaction is returned.
+  */
   private ApiResponse createCar(SidechainNodeView view, CreateCarBoxRequest ent) {
     CarBoxData carBoxData = new CarBoxData(ent.carProposition, 1, ent.vin, ent.year, ent.model, ent.color, ent.description);
-    //CarBoxData carBoxData = new CarBoxData(ent.carProposition, 1, ent.vin, 0, "", "", "");
 
     Optional<Box<Proposition>> inputBoxOpt  = view.getNodeWallet().allBoxes().stream().filter(box -> BytesUtils.toHexString(box.id()).equals(ent.boxId)).findFirst();
     if (!inputBoxOpt.isPresent()) {
@@ -109,6 +115,13 @@ public class CarApi extends ApplicationApiGroup
     return result;
   }
 
+  /*
+  Route to create car sell order.
+  Input parameters are Car Box and sell price.
+  Route checks if car box exists and then creates Sidechain Core transaction.
+  Output of this transaction is new Car Sell Order.
+  Hex representation of new transaction is returned.
+  */
   private ApiResponse createCarSellOrder(SidechainNodeView view, CreateCarSellOrderRequest ent) {
     try {
       long timestamp = System.currentTimeMillis();
@@ -151,6 +164,14 @@ public class CarApi extends ApplicationApiGroup
     }
   }
 
+  /*
+  Route to accept car sell order.
+  Input parameters are Car Sell Order, regular box to pay for car and proposition of the buyer.
+  Route checks if car sell order and regular box to pay exist and then creates Sidechain Core transaction.
+  Output of this transaction is new Car Box (with buyer as owner) and regular box with coins amount
+  equivalent to sell price as payment for car to previous car owner.
+  Hex representation of new transaction is returned.
+  */
   private ApiResponse acceptCarSellOrder(SidechainNodeView view, AcceptCarSellOrderRequest ent) {
     try {
       long timestamp = System.currentTimeMillis();
@@ -219,6 +240,14 @@ public class CarApi extends ApplicationApiGroup
     }
   }
 
+  /*
+  Route to cancel car sell order. Car Sell order can be cancelled by owner only.
+  Input parameters are Car Sell Order.
+  Route checks if car sell order exist and then creates Sidechain Core transaction.
+  Output of this transaction is new Car Box (with seller as owner).
+  Transaction does not spend any coin boxes.
+  Hex representation of new transaction is returned.
+  */
   private ApiResponse cancelCarSellOrder(SidechainNodeView view, CancelCarSellOrderRequest ent) {
     try {
       long timestamp = System.currentTimeMillis();
