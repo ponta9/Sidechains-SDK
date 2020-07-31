@@ -11,7 +11,9 @@ import scala.util.Try;
 
 import java.util.List;
 
-public class DefaultApplicationState implements ApplicationState {
+// There is no custom logic for Car registry State now.
+// TODO: prevent the declaration of CarBoxes which car information already exists in the previously added CarBoxes or CarSellOrderBoxes.
+public class CarRegistryApplicationState implements ApplicationState {
     @Override
     public boolean validate(SidechainStateReader stateReader, SidechainBlock block) {
         return true;

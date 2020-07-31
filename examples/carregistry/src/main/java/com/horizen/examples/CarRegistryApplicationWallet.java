@@ -7,7 +7,9 @@ import com.horizen.wallet.ApplicationWallet;
 
 import java.util.List;
 
-public class DefaultApplicationWallet implements ApplicationWallet {
+// There is no custom logic for Car registry Wallet now.
+// TODO: detect the CarSellOrderBoxes where buyer proposition is related to the Wallet secrets.
+public class CarRegistryApplicationWallet implements ApplicationWallet {
 
     @Override
     public void onAddSecret(Secret secret) {

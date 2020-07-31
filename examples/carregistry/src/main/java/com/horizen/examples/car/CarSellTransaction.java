@@ -5,15 +5,15 @@ import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.inject.Inject;
 import com.google.inject.assistedinject.Assisted;
-import com.horizen.box.Box;
 import com.horizen.box.BoxUnlocker;
 import com.horizen.box.NoncedBox;
-import com.horizen.box.RegularBox;
 import com.horizen.box.data.NoncedBoxData;
 import com.horizen.box.data.RegularBoxData;
 import com.horizen.companion.SidechainBoxesCompanion;
 import com.horizen.companion.SidechainBoxesDataCompanion;
 import com.horizen.companion.SidechainProofsCompanion;
+import com.horizen.examples.car.box.data.CarBoxData;
+import com.horizen.examples.car.box.data.CarSellOrderBoxData;
 import com.horizen.proof.Proof;
 import com.horizen.proposition.Proposition;
 import com.horizen.transaction.SidechainTransaction;
@@ -26,12 +26,12 @@ import java.io.ByteArrayOutputStream;
 import java.util.*;
 
 
-public class CarSellTransaction
+/*public class CarSellTransaction
         extends SidechainTransaction<Proposition, NoncedBox<Proposition>>
 {
     private List<byte[]> inputsIds;
 
-    private CarSellOrderData carSellOrderData;
+    private CarSellOrderBoxData carSellOrderBoxData;
     private CarBoxData carBoxData;
     private Optional<RegularBoxData> optionalPaymentBoxData;
     private Optional<RegularBoxData> optionalChangeBoxData;
@@ -50,7 +50,7 @@ public class CarSellTransaction
 
     @Inject
     CarSellTransaction(@Assisted("inputIds") List<byte[]> inputsIds,
-                       @Assisted("carSellOrderData") CarSellOrderData carSellOrderData,
+                       @Assisted("carSellOrderData") CarSellOrderBoxData carSellOrderBoxData,
                        @Assisted("carBoxData") CarBoxData carBoxData,
                        @Assisted("optionalPaymentBoxData") Optional<RegularBoxData> optionalPaymentBoxData,
                        @Assisted("optionalChangeBoxData") Optional<RegularBoxData> optionalChangeBoxData,
@@ -60,7 +60,7 @@ public class CarSellTransaction
                        SidechainBoxesDataCompanion boxesDataCompanion,
                        SidechainProofsCompanion proofsCompanion) {
         Objects.requireNonNull(inputsIds, "Inputs Ids list can't be null.");
-        Objects.requireNonNull(carSellOrderData, "Car Sell Order Data can't be null.");
+        Objects.requireNonNull(carSellOrderBoxData, "Car Sell Order Data can't be null.");
         Objects.requireNonNull(carBoxData, "Car Box Data can't be null.");
         Objects.requireNonNull(proofs, "Proofs list can't be null.");
         Objects.requireNonNull(boxesDataCompanion, "BoxesDataCompanion can't be null.");
@@ -68,7 +68,7 @@ public class CarSellTransaction
         // Do we need to care about inputs ids length here or state/serialization check is enough?
 
         this.inputsIds = inputsIds;
-        this.carSellOrderData = carSellOrderData;
+        this.carSellOrderBoxData = carSellOrderBoxData;
         this.carBoxData = carBoxData;
         this.optionalPaymentBoxData = optionalPaymentBoxData;
         this.optionalChangeBoxData = optionalChangeBoxData;
@@ -145,7 +145,7 @@ public class CarSellTransaction
         if(fee < 0 || timestamp < 0)
             return false;
 
-        if (carSellOrderData.proposition().equals(carBoxData.proposition())) {
+        if (carSellOrderBoxData.proposition().equals(carBoxData.proposition())) {
             if (inputsIds.size() > 1|| optionalPaymentBoxData.isPresent() ||
                 optionalChangeBoxData.isPresent())
                 return false;
@@ -156,8 +156,8 @@ public class CarSellTransaction
             if (!optionalPaymentBoxData.isPresent())
                 return false;
 
-            if (optionalPaymentBoxData.get().value() != carSellOrderData.value() ||
-                !optionalPaymentBoxData.get().proposition().equals(carSellOrderData.proposition()))
+            if (optionalPaymentBoxData.get().value() != carSellOrderBoxData.value() ||
+                !optionalPaymentBoxData.get().proposition().equals(carSellOrderBoxData.proposition()))
                 return false;
         }
 
@@ -182,7 +182,7 @@ public class CarSellTransaction
 
         byte[] inputIdsBytes = inputsIdsStream.toByteArray();
 
-        byte[] carSellOrderDataBytes = boxesDataCompanion.toBytes((NoncedBoxData)carSellOrderData);
+        byte[] carSellOrderDataBytes = boxesDataCompanion.toBytes((NoncedBoxData) carSellOrderBoxData);
 
         byte[] carBoxDataBytes = boxesDataCompanion.toBytes((NoncedBoxData)carBoxData);
 
@@ -290,7 +290,7 @@ public class CarSellTransaction
         ListSerializer<Proof<Proposition>> proofsSerializer = new ListSerializer<>(proofsCompanion, MAX_TRANSACTION_UNLOCKERS);
         List<Proof<Proposition>> proofs = proofsSerializer.parseBytes(Arrays.copyOfRange(bytes, offset, offset + batchSize));
 
-        return new CarSellTransaction(inputsIds, (CarSellOrderData) carSellOrderData, (CarBoxData) carBoxData, optionalPaymentBoxData,
+        return new CarSellTransaction(inputsIds, (CarSellOrderBoxData) carSellOrderData, (CarBoxData) carBoxData, optionalPaymentBoxData,
                 optionalChangeBoxData, proofs, fee, timestamp, boxesDataCompanion, proofsCompanion);
     }
-}
+}*/

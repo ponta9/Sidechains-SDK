@@ -10,11 +10,22 @@ import com.horizen.box.BoxSerializer;
 import com.horizen.box.NoncedBox;
 import com.horizen.box.data.NoncedBoxData;
 import com.horizen.box.data.NoncedBoxDataSerializer;
-import com.horizen.companion.SidechainBoxesCompanion;
 import com.horizen.companion.SidechainBoxesDataCompanion;
 import com.horizen.companion.SidechainProofsCompanion;
 import com.horizen.companion.SidechainTransactionsCompanion;
-import com.horizen.examples.car.*;
+import com.horizen.examples.car.api.CarApi;
+import com.horizen.examples.car.box.CarBoxSerializer;
+import com.horizen.examples.car.box.CarRegistryBoxesIdsEnum;
+import com.horizen.examples.car.box.CarSellOrderBoxSerializer;
+import com.horizen.examples.car.box.data.CarBoxDataSerializer;
+import com.horizen.examples.car.box.data.CarRegistryBoxesDataIdsEnum;
+import com.horizen.examples.car.box.data.CarSellOrderBoxDataSerializer;
+import com.horizen.examples.car.proof.CarRegistryProofsIdsEnum;
+import com.horizen.examples.car.proof.SellOrderSpendingProofSerializer;
+import com.horizen.examples.car.transaction.BuyCarTransactionSerializer;
+import com.horizen.examples.car.transaction.CarDeclarationTransactionSerializer;
+import com.horizen.examples.car.transaction.CarRegistryTransactionsIdsEnum;
+import com.horizen.examples.car.transaction.SellCarTransactionSerializer;
 import com.horizen.proof.Proof;
 import com.horizen.proof.ProofSerializer;
 import com.horizen.proposition.Proposition;
@@ -46,60 +57,61 @@ public class CarRegistryAppModule
 
     @Override
     protected void configure() {
-
+        // Get sidechain settings
         SidechainSettings sidechainSettings = this.settingsReader.getSidechainSettings();
 
-        HashMap<Byte, BoxSerializer<Box<Proposition>>> customBoxSerializers = new HashMap<>();
 
-        customBoxSerializers.put((byte)42, (BoxSerializer) CarBoxSerializer.getSerializer());
-        customBoxSerializers.put((byte)43, (BoxSerializer) CarSellOrderSerializer.getSerializer());
+        // Define custom serializers:
+        HashMap<Byte, BoxSerializer<Box<Proposition>>> customBoxSerializers = new HashMap<>();
+        customBoxSerializers.put(CarRegistryBoxesIdsEnum.CarBoxId.id(), (BoxSerializer) CarBoxSerializer.getSerializer());
+        customBoxSerializers.put(CarRegistryBoxesIdsEnum.CarSellOrderBoxId.id(), (BoxSerializer) CarSellOrderBoxSerializer.getSerializer());
 
         HashMap<Byte, NoncedBoxDataSerializer<NoncedBoxData<Proposition, NoncedBox<Proposition>>>> customBoxDataSerializers = new HashMap<>();
-
-        customBoxDataSerializers.put((byte)42, (NoncedBoxDataSerializer) CarBoxDataSerializer.getSerializer());
-        customBoxDataSerializers.put((byte)43, (NoncedBoxDataSerializer) CarSellOrderDataSerializer.getSerializer());
+        customBoxDataSerializers.put(CarRegistryBoxesDataIdsEnum.CarBoxDataId.id(), (NoncedBoxDataSerializer) CarBoxDataSerializer.getSerializer());
+        customBoxDataSerializers.put(CarRegistryBoxesDataIdsEnum.CarSellOrderBoxDataId.id(), (NoncedBoxDataSerializer) CarSellOrderBoxDataSerializer.getSerializer());
 
         HashMap<Byte, SecretSerializer<Secret>> customSecretSerializers = new HashMap<>();
-        HashMap<Byte, ProofSerializer<Proof<Proposition>>> customProofSerializers = new HashMap<>();
 
-        customProofSerializers.put((byte)10, (ProofSerializer) CarBuyerSignature25519Serializer.getSerializer());
+        HashMap<Byte, ProofSerializer<Proof<Proposition>>> customProofSerializers = new HashMap<>();
+        customProofSerializers.put(CarRegistryProofsIdsEnum.SellOrderSpendingProofId.id(), (ProofSerializer) SellOrderSpendingProofSerializer.getSerializer());
 
         HashMap<Byte, TransactionSerializer<BoxTransaction<Proposition, Box<Proposition>>>> customTransactionSerializers = new HashMap<>();
+        customTransactionSerializers.put(CarRegistryTransactionsIdsEnum.CarDeclarationTransactionId.id(), (TransactionSerializer) CarDeclarationTransactionSerializer.getSerializer());
+        customTransactionSerializers.put(CarRegistryTransactionsIdsEnum.SellCarTransactionId.id(), (TransactionSerializer) SellCarTransactionSerializer.getSerializer());
+        customTransactionSerializers.put(CarRegistryTransactionsIdsEnum.BuyCarTransactionId.id(), (TransactionSerializer) BuyCarTransactionSerializer.getSerializer());
 
         SidechainBoxesDataCompanion sidechainBoxesDataCompanion = new SidechainBoxesDataCompanion(customBoxDataSerializers);
         SidechainProofsCompanion sidechainProofsCompanion = new SidechainProofsCompanion(customProofSerializers);
+        SidechainTransactionsCompanion transactionsCompanion = new SidechainTransactionsCompanion(
+                customTransactionSerializers, sidechainBoxesDataCompanion, sidechainProofsCompanion);
 
-        CarSellTransactionSerializer carSellTransactionSerializer = new CarSellTransactionSerializer(sidechainBoxesDataCompanion, sidechainProofsCompanion);
 
-        customTransactionSerializers.put((byte)10, (TransactionSerializer) carSellTransactionSerializer);
+        // Define Application state and wallet logic:
+        ApplicationWallet defaultApplicationWallet = new CarRegistryApplicationWallet();
+        ApplicationState defaultApplicationState = new CarRegistryApplicationState();
 
-        ApplicationWallet defaultApplicationWallet = new DefaultApplicationWallet();
-        ApplicationState defaultApplicationState = new DefaultApplicationState();
 
-        File secretStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/secret");
-        File walletBoxStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/wallet");
-        File walletTransactionStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/walletTransaction");
-        File walletForgingBoxesInfoStorage = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/walletForgingStake");
-        File stateStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/state");
-        File historyStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/history");
-        File consensusStore = new File(sidechainSettings.scorexSettings().dataDir().getAbsolutePath() + "/consensusData");
+        // Define the path to storages:
+        String dataDirPath = sidechainSettings.scorexSettings().dataDir().getAbsolutePath();
+        File secretStore = new File( dataDirPath + "/secret");
+        File walletBoxStore = new File(dataDirPath + "/wallet");
+        File walletTransactionStore = new File(dataDirPath + "/walletTransaction");
+        File walletForgingBoxesInfoStorage = new File(dataDirPath + "/walletForgingStake");
+        File stateStore = new File(dataDirPath + "/state");
+        File historyStore = new File(dataDirPath + "/history");
+        File consensusStore = new File(dataDirPath + "/consensusData");
 
-        // Here I can add my custom rest api and/or override existing one
+
+        // Add car registry specific API endpoints:
         List<ApplicationApiGroup> customApiGroups = new ArrayList<>();
-        customApiGroups.add(new CarApi(
-                new SidechainTransactionsCompanion(
-                        customTransactionSerializers,
-                        sidechainBoxesDataCompanion,
-                        sidechainProofsCompanion
-                ),
-                sidechainBoxesDataCompanion,
-                sidechainProofsCompanion));
+        customApiGroups.add(new CarApi(transactionsCompanion, sidechainBoxesDataCompanion, sidechainProofsCompanion));
 
-        // Here I can reject some of existing API routes
-        // Each pair consists of "group name" -> "route name"
-        // For example new Pair("wallet, "allBoxes");
+
+        // No core API endpoints to be disabled:
         List<Pair<String, String>> rejectedApiPaths = new ArrayList<>();
 
+
+        // Inject custom objects:
         bind(SidechainSettings.class)
                 .annotatedWith(Names.named("SidechainSettings"))
                 .toInstance(sidechainSettings);

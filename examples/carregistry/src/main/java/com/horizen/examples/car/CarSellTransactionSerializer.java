@@ -8,7 +8,7 @@ import com.horizen.transaction.TransactionSerializer;
 import scorex.util.serialization.Reader;
 import scorex.util.serialization.Writer;
 
-public final class CarSellTransactionSerializer implements TransactionSerializer<CarSellTransaction>
+/*public final class CarSellTransactionSerializer implements TransactionSerializer<CarSellTransaction>
 {
     private SidechainBoxesDataCompanion boxesDataCompanion;
     private SidechainProofsCompanion proofsCompanion;
@@ -28,4 +28,4 @@ public final class CarSellTransactionSerializer implements TransactionSerializer
     public CarSellTransaction parse(Reader reader) {
         return CarSellTransaction.parseBytes(reader.getBytes(reader.remaining()), boxesDataCompanion, proofsCompanion);
     }
-}
+}*/
