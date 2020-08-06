@@ -4,7 +4,7 @@ MAINTAINER infrastructure@zensystem.io
 
 SHELL ["/bin/bash", "-c"]
 
-COPY entrypoint.sh entrypoint_setup_gpg.sh /usr/local/bin/
+COPY ci/docker_ci_builder/entrypoint.sh ci/docker_ci_builder/entrypoint_setup_gpg.sh /usr/local/bin/
 
 # Get Ubuntu packages
 RUN set -eux && export GOSU_VERSION=1.12 && export DEBIAN_FRONTEND=noninteractive \
