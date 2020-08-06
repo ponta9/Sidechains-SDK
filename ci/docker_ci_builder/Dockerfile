@@ -9,7 +9,7 @@ COPY ci/docker_ci_builder/entrypoint.sh ci/docker_ci_builder/entrypoint_setup_gp
 # Get Ubuntu packages
 RUN set -eux && export GOSU_VERSION=1.12 && export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl dirmngr gnupg2 \
+    && apt-get install -y --no-install-recommends ca-certificates curl dirmngr gnupg2 libxml-xpath-perl\
     && dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
     && curl -L "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" > /usr/local/bin/gosu \
     && curl -L "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc" >  /usr/local/bin/gosu.asc \
